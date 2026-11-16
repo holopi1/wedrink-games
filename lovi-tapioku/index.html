@@ -336,6 +336,15 @@ body > .wdx-ibtn{position:absolute}
 }
 /* v6: быстрая кнопка звука в игре — правый нижний угол (строка подсказки), чтобы не закрывать счёт */
 .wdx-snd{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 1px);width:38px;height:38px}
+
+/* v7: строки приза на билете, одинаковые во всех играх */
+.ticket{flex:none}
+.ticket-prize{font-size:21px;line-height:1.12;font-weight:900;color:var(--brand-dark);margin:0 0 7px}
+.ticket-lab{font-size:12px;line-height:1.2;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ticket-valid{margin-top:8px;font-size:12.5px;line-height:1.28;font-weight:800;color:var(--ink)}
+.ticket-cond{margin-top:6px;font-size:11.5px;line-height:1.3;font-weight:600;color:var(--muted)}
+@media (max-height:640px){.ticket-prize{font-size:19px;margin-bottom:3px}.ticket-valid{margin-top:5px;font-size:12px}.ticket-cond{margin-top:4px;font-size:11px;line-height:1.25}}
+#app.winter .ticket-prize{padding:0 34px}
 </style>
 </head>
 <body>
@@ -346,7 +355,7 @@ body > .wdx-ibtn{position:absolute}
     <div class="brand-id">
       <div class="wm">WeDrink<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17M12 6l-2.6-2.4M12 6l2.6-2.4M12 18l-2.6 2.4M12 18l2.6 2.4"/></svg></div>
       <div class="city">Новосибирск</div>
-      <div class="tag">Настоящий азиатский чай</div>
+      <div class="tag">Бабл-ти из Китая</div>
     </div>
     <div class="hud-score" id="hud-score" hidden><i>Счёт</i><b id="hud-num">0</b></div>
   </header>
@@ -410,11 +419,11 @@ body > .wdx-ibtn{position:absolute}
 
 <script>
 /* ============================================================================
-   WDX (v6) — общий слой всех игр и зала WeDrink: настройки, музыка, Telegram Mini App.
+   WDX (v7) — общий слой всех игр и зала WeDrink: настройки, музыка, Telegram Mini App, MAX, VK Mini Apps, слова дня.
    Один и тот же код лежит в зале и в каждой игре (файлы самодостаточны).
    Профиль wedrink.profile.v1: пишем только поля music и sfx (по умолчанию включено), остальное не трогаем.
    Музыка: assets/music.mp3 тянется лениво, только после первого касания. Внешних запросов нет,
-   кроме скрипта Telegram и только внутри Telegram.
+   кроме скриптов клиентов (Telegram, MAX, VK Bridge) и только внутри своего клиента.
    ============================================================================ */
 (function () {
   'use strict';
@@ -423,6 +432,15 @@ body > .wdx-ibtn{position:absolute}
   var MUSIC_VOL = 0.35;                      // громкость фоновой музыки
   var TG_SRC = 'https://telegram.org/js/telegram-web-app.js';
   var TG_FLAG = 'wedrink.tg';
+  var MAX_SRC = 'https://st.max.ru/js/max-web-app.js';                  // dev.max.ru/docs/webapps/bridge, «Подключение библиотеки»
+  var MAX_FLAG = 'wedrink.max';
+  var VK_SRC = 'https://unpkg.com/@vkontakte/vk-bridge@2.15.12/dist/browser.min.js';   // адрес из dev.vk.ru/en/bridge/getting-started, версия закреплена
+  var VK_SRI = 'sha384-zMslrVQ3fVDIQqW7ztZS5ewZJsN29NP1vJFbKATVzqIeeinYRVG8gCR2p7X/SuwC';
+  var LP_KEY = 'wedrink.lp';                  // параметры запуска (VK / MAX / Telegram), чтобы не терять при переходах зал <-> игра
+  /* Строки условий приза: одна и та же на экране приза во всех играх */
+  var COND = '290 очков — −40 ₽ на напиток, все 300 — напиток до 250 ₽ за наш счёт. Назови на кассе слово дня и номер телефона: каждый приз — раз в день, в одном заказе — один приз, кофе не участвует.';
+  var VALID = 'Слово действует сегодня до закрытия точки (22:00 по Новосибирску).';
+  var HEAD = { topping: '−40\u00a0₽ на\u00a0напиток', drink: 'Напиток до\u00a0250\u00a0₽ за\u00a0наш\u00a0счёт' };
   var HALL_COLOR = { light: '#FBF7EC', winter: '#0F5059' };
   var GAME_COLOR = { light: '#FBF7EC', winter: '#0F5059' };
 
@@ -430,6 +448,7 @@ body > .wdx-ibtn{position:absolute}
   var cache = {}, ui = {}, audio = null, ctx = null, gain = null;
   var started = false, suspended = false, lastFocus = null, touched = false;
   var theme = { winter: false }, tgW = null, tgPending = false, tgLoading = false;
+  var mxW = null, mxLoading = false, vkB = null, vkLoading = false, coded = null;
 
   /* ---------- профиль: читаем целиком, меняем одно поле ---------- */
   function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
@@ -446,12 +465,38 @@ body > .wdx-ibtn{position:absolute}
     try { p = readProfile(); p[name] = !!on; window.localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* без хранилища — до конца сессии */ }
   }
 
-  /* ---------- адрес зала (с сохранением ?season=) ---------- */
+  /* ---------- параметры запуска клиентов: VK (vk_*, sign), Telegram (tgWebApp*), MAX (WebApp*) ---------- */
+  var LP_NAME = /^(vk_[a-z_]+|sign|tgWebApp[A-Za-z]*|WebApp[A-Za-z]*)$/;
+  function launchQuery() {                    // только служебные параметры клиентов, без ?preview= и ?season=
+    var q = '', parts, i, out = [], k, saved = '';
+    try { q = String(window.location.search || '').replace(/^\?/, ''); } catch (e) { q = ''; }
+    parts = q ? q.split('&') : [];
+    for (i = 0; i < parts.length; i++) { k = parts[i].split('=')[0]; if (LP_NAME.test(k)) out.push(parts[i]); }
+    if (out.length) {
+      q = out.join('&');
+      try { window.sessionStorage.setItem(LP_KEY, q); } catch (e) { /* нет sessionStorage */ }
+      return q;
+    }
+    try { saved = window.sessionStorage.getItem(LP_KEY) || ''; } catch (e) { saved = ''; }
+    return /^[A-Za-z0-9_=&%.~+\-]*$/.test(saved) ? saved : '';
+  }
+  function maxHash() {                        // MAX кладёт WebAppData, WebAppPlatform, WebAppVersion в часть после # (dev.max.ru/docs/webapps/validation)
+    var h = '';
+    try { h = String(window.location.hash || ''); } catch (e) { h = ''; }
+    return /[#&](WebAppData|WebAppPlatform|WebAppVersion)=/.test(h) ? h : '';
+  }
+  function withParams(url) {                  // дописать к ссылке параметры запуска, если они есть
+    var h = '', i = url.indexOf('#'), lp = launchQuery();
+    if (i >= 0) { h = url.slice(i); url = url.slice(0, i); }
+    if (lp) url += (url.indexOf('?') < 0 ? '?' : '&') + lp;
+    if (!h) h = maxHash();
+    return url + h;
+  }
   function hallUrl() {
     var m = null, q = '';
     try { m = /[?&]season=(winter|default)(?:&|$)/.exec(String(window.location.search || '')); } catch (e) { m = null; }
     if (m && !cfg.hall) q = '?season=' + m[1];
-    return cfg.base + 'index.html' + q;
+    return withParams(cfg.base + 'index.html' + q);
   }
   function goHall() { try { window.location.href = hallUrl(); } catch (e) { /* адрес недоступен */ } }
 
@@ -555,21 +600,112 @@ body > .wdx-ibtn{position:absolute}
       document.head.appendChild(s);
     } catch (e) { tgLoading = false; }
   }
-  var HAPTIC_IMPACT = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1 };
-  function haptic(kind) {                     // kind: light | medium | heavy | success | warning | error | select
-    var h;
+  /* ---------- MAX (dev.max.ru/docs/webapps/introduction, /webapps/bridge, /webapps/validation) ---------- */
+  function inMax() {
+    var q = '';
+    if (maxHash()) return true;
+    try { q = String(window.location.search || ''); } catch (e) { q = ''; }
+    if (/[?&]WebAppStartParam=/.test(q)) return true;
+    try { if (window.sessionStorage.getItem(MAX_FLAG) === '1') return true; } catch (e) { /* нет sessionStorage */ }
+    return false;
+  }
+  function mxCall(obj, name, a, b) { try { if (obj && typeof obj[name] === 'function') return obj[name](a, b); } catch (e) { /* не поддерживается */ } }
+  function maxApply() {
+    var bb;
+    if (!mxW) return;
+    mxCall(mxW, 'ready');                     // в документации метода нет: вызываем, только если он есть
     try {
-      h = tgW && tgVer('6.1') ? tgW.HapticFeedback : null;
-      if (!h) return false;
-      if (kind === 'success' || kind === 'warning' || kind === 'error') h.notificationOccurred(kind);
-      else if (kind === 'select') h.selectionChanged();
-      else h.impactOccurred(HAPTIC_IMPACT[kind] ? kind : 'light');
+      bb = mxW.BackButton;
+      if (bb) {
+        mxCall(bb, 'offClick', goHall);
+        if (cfg.hall) mxCall(bb, 'hide');
+        else { mxCall(bb, 'onClick', goHall); mxCall(bb, 'show'); }
+      }
+    } catch (e) { /* не страшно */ }
+  }
+  function maxLoad() {
+    var s;
+    if (mxLoading || mxW) return;
+    mxLoading = true;
+    try { window.sessionStorage.setItem(MAX_FLAG, '1'); } catch (e) { /* нет sessionStorage */ }
+    try {
+      s = document.createElement('script');
+      s.src = MAX_SRC; s.async = true;
+      s.onload = function () { try { mxW = window.WebApp && typeof window.WebApp === 'object' ? window.WebApp : null; } catch (e) { mxW = null; } maxApply(); };
+      s.onerror = function () { mxLoading = false; };
+      document.head.appendChild(s);
+    } catch (e) { mxLoading = false; }
+  }
+
+  /* ---------- VK Mini Apps (dev.vk.ru: bridge/getting-started, bridge/VKWebAppInit, mini-apps/development/launch-params) ---------- */
+  function inVk() {
+    var q = launchQuery();
+    return /(^|&)vk_app_id=/.test(q) || (/(^|&)sign=/.test(q) && /(^|&)vk_/.test(q));
+  }
+  function vkSend(name, params) {
+    var p;
+    try {
+      if (!vkB || typeof vkB.send !== 'function') return false;
+      p = vkB.send(name, params || {});
+      if (p && typeof p.catch === 'function') p.catch(function () { /* вне приложения, в фоне или метод не поддерживается */ });
       return true;
     } catch (e) { return false; }
   }
-  function buzz(p) {                          // замена navigator.vibrate: в Telegram — HapticFeedback, иначе обычная вибрация
+  function vkApply() {
+    var c = tgColor(), q = launchQuery(), p = { status_bar_style: theme.winter ? 'light' : 'dark' };
+    if (/(^|&)vk_platform=[a-z_]*android/.test(q)) { p.action_bar_color = c; p.navigation_bar_color = c; }   // цвета шапки — только Android
+    vkSend('VKWebAppSetViewSettings', p);
+  }
+  function vkLoad() {
+    var s;
+    if (vkLoading || vkB) return;
+    vkLoading = true;
+    try {
+      s = document.createElement('script');
+      s.src = VK_SRC; s.async = true;
+      if (VK_SRI) { s.integrity = VK_SRI; s.crossOrigin = 'anonymous'; }
+      s.onload = function () {
+        try { vkB = window.vkBridge && typeof window.vkBridge.send === 'function' ? window.vkBridge : null; } catch (e) { vkB = null; }
+        vkSend('VKWebAppInit');               // первое событие приложения: без него VK считает его незапущенным
+        vkApply();
+      };
+      s.onerror = function () { vkLoading = false; };
+      document.head.appendChild(s);
+    } catch (e) { vkLoading = false; }
+  }
+
+  var HAPTIC_IMPACT = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1 };
+  function haptic(kind) {                     // kind: light | medium | heavy | success | warning | error | select
+    var h, st;
+    try {
+      h = tgW && tgVer('6.1') ? tgW.HapticFeedback : null;
+      if (h) {
+        if (kind === 'success' || kind === 'warning' || kind === 'error') h.notificationOccurred(kind);
+        else if (kind === 'select') h.selectionChanged();
+        else h.impactOccurred(HAPTIC_IMPACT[kind] ? kind : 'light');
+        return true;
+      }
+    } catch (e) { /* дальше */ }
+    try {
+      h = mxW && mxW.HapticFeedback;          // MAX: impactOccurred / notificationOccurred / selectionChanged; на desktop и в web не работает
+      if (h && typeof h.impactOccurred === 'function') {
+        if (kind === 'success' || kind === 'warning' || kind === 'error') mxCall(h, 'notificationOccurred', kind);
+        else if (kind === 'select') mxCall(h, 'selectionChanged');
+        else mxCall(h, 'impactOccurred', HAPTIC_IMPACT[kind] ? kind : 'light');
+        return true;
+      }
+    } catch (e) { /* дальше */ }
+    if (vkB) {                                // VK: Taptic*; impact — только light | medium | heavy
+      if (kind === 'success' || kind === 'warning' || kind === 'error') return vkSend('VKWebAppTapticNotificationOccurred', { type: kind });
+      if (kind === 'select') return vkSend('VKWebAppTapticSelectionChanged');
+      st = kind === 'soft' ? 'light' : (kind === 'rigid' ? 'heavy' : (kind === 'light' || kind === 'medium' || kind === 'heavy' ? kind : 'light'));
+      return vkSend('VKWebAppTapticImpactOccurred', { style: st });
+    }
+    return false;
+  }
+  function buzz(p) {                          // замена navigator.vibrate: в клиентах — их тактильная отдача, иначе обычная вибрация
     var k;
-    if (tgW) {
+    if (tgW || mxW || vkB) {
       if (typeof p === 'number') k = p <= 12 ? 'light' : (p <= 22 ? 'medium' : 'heavy');
       else if (p && p.length >= 5) k = 'success';
       else if (p && p.length === 3 && p[0] >= 28) k = 'error';
@@ -589,6 +725,7 @@ body > .wdx-ibtn{position:absolute}
       if (m) m.setAttribute('content', tgColor());
     } catch (e) { /* не страшно */ }
     if (tgW) tgApply();
+    if (vkB) vkApply();
   }
 
   /* ---------- интерфейс настроек ---------- */
@@ -670,6 +807,55 @@ body > .wdx-ibtn{position:absolute}
     syncUi();
   }
 
+  /* ---------- слова дня: закодированный формат (v7). Это усложнение, не защита ---------- */
+  /*CODEC*/
+  var WK = ['Vk7', 'cassa', 'nsk', 'm9', 'Q2'];            // ключ собирается из частей, зависит от вида приза и индекса дня
+  function wkey(k, d) { return WK[2] + k + WK[0] + d + WK[3] + WK[1] + (d * 7 + 3) + WK[4]; }
+  function wxor(bytes, k, d) {
+    var s = wkey(k, d), n = s.length, kc = k === 'd' ? 5 : 3, out = [], i;
+    for (i = 0; i < bytes.length; i++) out.push(bytes[i] ^ ((s.charCodeAt(i % n) + i * 11 + d * 17 + kc * 31) & 255));
+    return out;
+  }
+  function decWord(b64, k, d) {                // base64 -> XOR -> UTF-8
+    var bin = atob(b64), bytes = [], i, out, u8;
+    for (i = 0; i < bin.length; i++) bytes.push(bin.charCodeAt(i));
+    out = wxor(bytes, k, d); u8 = new Uint8Array(out);
+    if (typeof TextDecoder === 'function') return new TextDecoder('utf-8', { fatal: true }).decode(u8);
+    bin = ''; for (i = 0; i < out.length; i++) bin += String.fromCharCode(out[i]);
+    return decodeURIComponent(escape(bin));
+  }
+  function encWord(w, k, d) {                  // нужен только для проверки алгоритма; игры им не пользуются
+    var bytes = [], u8, i, bin = '';
+    if (typeof TextEncoder === 'function') u8 = new TextEncoder().encode(w); else { u8 = []; w = unescape(encodeURIComponent(w)); for (i = 0; i < w.length; i++) u8.push(w.charCodeAt(i)); }
+    for (i = 0; i < u8.length; i++) bytes.push(u8[i]);
+    bytes = wxor(bytes, k, d);
+    for (i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  /*ENDCODEC*/
+  function okEnc(a) {
+    var i;
+    if (!Array.isArray(a) || a.length !== 7) return false;
+    for (i = 0; i < 7; i++) if (typeof a[i] !== 'string' || !/^[A-Za-z0-9+\/]{2,80}={0,2}$/.test(a[i])) return false;
+    return true;
+  }
+  function setCoded(t, d) {                    // хранит только закодированные строки
+    if (!okEnc(t) || !okEnc(d)) return false;
+    coded = { t: t.slice(), d: d.slice() };
+    return true;
+  }
+  function word(kind, dow, plain) {            // слово дня: раскодируется в момент вызова и нигде не сохраняется
+    var k = kind === 'drink' ? 'd' : 't', w = '';
+    if (coded) {
+      try { w = decWord(coded[k][dow], k, dow); } catch (e) { w = ''; }
+      if (w && w.length <= 40 && !/[<>]/.test(w)) return w;
+    }
+    return (plain && plain[dow]) || '';
+  }
+  function tail() {                            // строка про срок слова и строка условий: одинаковы во всех играх
+    return '<div class="ticket-valid">' + VALID + '</div><div class="ticket-cond">' + COND + '</div>';
+  }
+
   /* ---------- параметр ?preview=N: экран приза без игры, слово всегда «ПРИМЕР» ---------- */
   function previewScore() {
     var m = null, n;
@@ -699,11 +885,15 @@ body > .wdx-ibtn{position:absolute}
       if (e && e.key === PROFILE_KEY) { cache = {}; syncUi(); if (!pref('music')) stop(); }
     });
     if (inTelegram()) tgLoad();
+    else if (inVk()) vkLoad();
+    else if (inMax()) maxLoad();
   }
 
   window.WDX = {
     init: init, theme: setTheme, buzz: buzz, haptic: haptic, previewScore: previewScore,
-    pref: pref, openSettings: openSettings, goHall: goHall, inTelegram: inTelegram,
+    pref: pref, openSettings: openSettings, goHall: goHall, inTelegram: inTelegram, inMax: inMax, inVk: inVk,
+    withParams: withParams, setCoded: setCoded, word: word, tail: tail, head: function (k) { return HEAD[k === 'drink' ? 'drink' : 'topping']; },
+    COND: COND, VALID: VALID, _enc: encWord,
     PREVIEW_WORD: 'ПРИМЕР'
   };
 })();
@@ -731,10 +921,10 @@ body > .wdx-ibtn{position:absolute}
 /* Единственный сетевой запрос игры. Таймаут 2,5 с. При любой ошибке, при открытии с диска (file://) и при неверной
    форме (два массива по 7 непустых строк) остаются встроенные значения выше. Экран приза читает слова в момент показа. */
 function refreshTicketWords() {   // билет мог быть показан до ответа сервера (экран «попытки кончились»): обновить слова и метку
-  var ws = document.querySelectorAll('.ticket-word[data-wk]'), i, w, a, d, tags;
+  var ws = document.querySelectorAll('.ticket-word[data-wk]'), i, w, a, d, tags, t;
   for (i = 0; i < ws.length; i++) {
     w = ws[i]; a = w.getAttribute('data-wk') === 'drink' ? WORDS_DRINK : WORDS_TOPPING; d = parseInt(w.getAttribute('data-dow'), 10);
-    if (a[d]) w.textContent = a[d];
+    t = WDX.word(w.getAttribute('data-wk'), d, a); if (t) w.textContent = t;
   }
   if (!IS_PROTOTYPE) { tags = document.querySelectorAll('.ticket-tag:not([data-pv])'); for (i = 0; i < tags.length; i++) tags[i].style.display = "none"; }
 }
@@ -752,9 +942,12 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     fetch('../config/words.json?v=' + Math.floor(Date.now() / 86400000), ctl ? { signal: ctl.signal } : undefined)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (o) {
-        if (!o || !okList(o.topping) || !okList(o.drink)) return;
-        WORDS_TOPPING = o.topping.map(function (s) { return s.trim(); });
-        WORDS_DRINK = o.drink.map(function (s) { return s.trim(); });
+        if (!o) return;
+        if (!(o.t && o.d && WDX.setCoded(o.t, o.d))) {          // v7: слова закодированы и раскодируются только при показе билета; иначе — старый формат
+          if (!okList(o.topping) || !okList(o.drink)) return;
+          WORDS_TOPPING = o.topping.map(function (s) { return s.trim(); });
+          WORDS_DRINK = o.drink.map(function (s) { return s.trim(); });
+        }
         if (typeof o.prototype === 'boolean') IS_PROTOTYPE = o.prototype;
         onWeekWords();
       })
@@ -2243,18 +2436,18 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear() + ' · ' +
       pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
   }
-  function prizeTitle(score) { return score >= PRIZE_DRINK ? 'Напиток в подарок' : 'Топпинг в подарок'; }
-  function prizeSub(score) { return score >= PRIZE_DRINK ? 'К любой покупке' : 'К любому напитку'; }
+  function prizeTitle(score) { return score >= PRIZE_DRINK ? 'Все 300 очков' : 'Есть приз'; }
+  function prizeSub(score) { return ''; }
   var PREVIEW = false;                               // ?preview=N: экран приза без игры, слово всегда «ПРИМЕР», ничего не пишется
   function fillTicket(node, score, dow, withGift) {
-    var word = PREVIEW ? WDX.PREVIEW_WORD : ((score >= PRIZE_DRINK ? WORDS_DRINK : WORDS_TOPPING)[dow] || '');
+    var pk = score >= PRIZE_DRINK ? 'drink' : 'topping';
+    var word = PREVIEW ? WDX.PREVIEW_WORD : WDX.word(pk, dow, pk === 'drink' ? WORDS_DRINK : WORDS_TOPPING);
     node.innerHTML =                                // только свои константы
       '<div class="ribbon" aria-hidden="true"></div>' +
       (PREVIEW ? '<div class="ticket-tag" data-pv="1">просмотр</div>' : (IS_PROTOTYPE ? '<div class="ticket-tag">прототип</div>' : '')) +
-      (withGift ? '<div class="ticket-gift">' + prizeTitle(score) + ' · ' + prizeSub(score).toLowerCase() + '</div>' : '') +
-      '<div class="ticket-how">На кассе назови номер телефона и&nbsp;слово дня</div>' +
+      '<div class="ticket-prize">' + WDX.head(pk) + '</div><div class="ticket-lab">Слово дня</div>' +
       '<div class="ticket-word"' + (PREVIEW ? '' : ' data-wk="' + (score >= PRIZE_DRINK ? 'drink' : 'topping') + '" data-dow="' + dow + '"') + '>' + word + '</div>' +
-      '<div class="ticket-rule">Один приз в&nbsp;день на&nbsp;гостя</div>' +
+      WDX.tail() +
       '<div class="ticket-stamp js-stamp"></div>';
     node.hidden = false;
   }
@@ -2293,7 +2486,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     var kept = !prize && day.best >= PRIZE_TOPPING;  // приз взят прошлой попыткой — билет остаётся на экране
     if (prize) title = prizeTitle(score);
     else if (need > 100) title = 'Попробуй ещё: рука привыкнет';
-    else title = 'Почти. До топпинга не хватило ' + need;
+    else title = 'Почти. До приза не хватило ' + need;
     if (prize) el.screens.result.classList.add('prize'); else el.screens.result.classList.remove('prize');
     el.resTitle.textContent = title;
     el.resSub.textContent = prize ? prizeSub(score) : '';
