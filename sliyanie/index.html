@@ -2149,8 +2149,16 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     return { date: today, dow: now.getDay(), drink: drink, seed: seedFor(dateIntOf(today), day.used), attempt: day.used, hot: WINTER && !!HOT_DAYS[now.getDay()] };
   }
   // Показать игровой экран; cb вызывается, когда экран уже на месте (с этого момента идёт время раунда)
+  // Если поле игры ещё нулевого размера (iframe оболочки или Telegram получили размер позже старта), ждём ненулевого размера и не стартуем вслепую
+  var stageWait = false;
+  function waitStage(cb, tries) {
+    if (el.stage.clientWidth >= 2 && el.stage.clientHeight >= 2) { stageWait = false; if (cb) cb(); return; }
+    stageWait = true;
+    if ((tries || 0) > 1200) { stageWait = false; return; }          // минуту размера нет — игра так и не стартует, но и не падает
+    setTimeout(function () { waitStage(cb, (tries || 0) + 1); }, 50);
+  }
   function enterGame(cb) {
-    show('game', function () { starting = false; if (cb) cb(); });
+    show('game', function () { starting = false; waitStage(cb, 0); });
   }
   // Конец попытки: счёт 0–300 (целое), rowsHtml — три плашки результата (только числа и свои слова)
   function endAttempt(g, score, rowsHtml) {
@@ -2906,7 +2914,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     lastFrame = now;
     if (dt < 0) dt = 0;
     if (dt > 0.05) dt = 0.05;                              // после паузы или подвисания время не «проскакивает»
-    if (screen === 'game' && GAME.active()) {
+    if (screen === 'game' && GAME.active() && !stageWait) {
       if (GAME.update(now, dt)) GAME.draw();
     } else {
       if (screen === 'start') { if (GAME.heroFrame) GAME.heroFrame(dt); else heroFrame(dt); }
