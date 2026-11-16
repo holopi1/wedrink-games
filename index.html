@@ -127,8 +127,10 @@ body.winter .card{box-shadow:0 10px 26px rgba(0,0,0,.34),inset 0 0 0 1px rgba(27
   background:radial-gradient(60% 100% at 50% 100%,#fff 0 60%,transparent 62%) 0 0/160px 44px repeat-x;opacity:.92}
 body.winter .drift{display:block}
 /* оболочка (Р-1176): игра открывается в iframe поверх зала, плеер остаётся в зале */
-.shell-frame{position:fixed;top:0;left:0;width:100%;height:100%;border:0;display:block;z-index:200;background:#0F5059}
-body.shell-open{overflow:hidden}
+.shell-frame{position:fixed;top:env(safe-area-inset-top,0px);left:env(safe-area-inset-left,0px);width:calc(100% - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:calc(100% - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));border:0;display:block;z-index:200;background:#0F5059}
+/* в iframe iOS отдаёт env(safe-area-inset-*) нулями: поля вырезов оставляет оболочка; под ними — фон игры, не зал */
+body.shell-open{overflow:hidden;background:#FBF7EC !important}
+body.shell-open.winter{background:#0F5059 !important}
 @media (prefers-reduced-motion:reduce){.mascot,.garland i{animation:none}.card,.card .cta{transition:none}}
 
 /* ===== v6: общий слой — кнопка «Все игры», настройки, быстрая кнопка звука, касания, безопасные зоны ===== */
@@ -311,6 +313,14 @@ body > .wdx-ibtn{position:absolute}
   function setBack(cb) { backCb = typeof cb === 'function' ? cb : null; if (tgW) tgApply(); if (mxW) maxApply(); }
 
   /* ---------- оболочка (Р-1176): зал держит плеер, игра внутри iframe шлёт ему сообщения; музыка не прерывается при переходах ---------- */
+  var HAPTIC_OK = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1, success: 1, warning: 1, error: 1, select: 1 };
+  function buzzPat(p) {                       // число или короткий массив чисел 0…500 мс (то, что приходит из игры, чистим)
+    var out = [], i;
+    if (typeof p === 'number') return Math.max(0, Math.min(500, +p || 0));
+    if (!Array.isArray(p)) return 10;
+    for (i = 0; i < p.length && i < 12; i++) out.push(Math.max(0, Math.min(500, +p[i] || 0)));
+    return out;
+  }
   function shellFlag() {                      // игра открыта внутри iframe зала: в адресе shell=1 и есть родитель
     var q = '';
     try { q = String(window.location.search || ''); } catch (e) { q = ''; }
@@ -338,6 +348,8 @@ body > .wdx-ibtn{position:absolute}
     else if (m.t === 'next') { skip(); syncUi(); }
     else if (m.t === 'hold') { holdMode = true; stop(); }
     else if (m.t === 'release') { holdMode = false; if (pref('music')) play(); }
+    else if (m.t === 'haptic') { touched = true; if (HAPTIC_OK[m.k] === 1) haptic(m.k); }
+    else if (m.t === 'buzz') { touched = true; buzz(buzzPat(m.p)); }
     else if (m.t === 'close') { if (shellClose) shellClose(); }
   }
 
@@ -718,6 +730,7 @@ body > .wdx-ibtn{position:absolute}
   var HAPTIC_IMPACT = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1 };
   function haptic(kind) {                     // kind: light | medium | heavy | success | warning | error | select
     var h, st;
+    if (cfg.shell) { shellPost('haptic', { k: kind }); return true; }     // в оболочке библиотек платформ нет: зал отдаёт сам
     try {
       h = tgW && tgVer('6.1') ? tgW.HapticFeedback : null;
       if (h) {
@@ -746,6 +759,7 @@ body > .wdx-ibtn{position:absolute}
   }
   function buzz(p) {                          // замена navigator.vibrate: в клиентах — их тактильная отдача, иначе обычная вибрация
     var k;
+    if (cfg.shell) { shellPost('buzz', { p: buzzPat(p) }); return; }
     if (tgW || mxW || vkB) {
       if (typeof p === 'number') k = p <= 12 ? 'light' : (p <= 22 ? 'medium' : 'heavy');
       else if (p && p.length >= 5) k = 'success';
@@ -1060,7 +1074,7 @@ var grid = document.getElementById('grid'), cards = [];
     (function (game) {
       a.addEventListener('click', function (e) {            // обычный тап — игра в оболочке; Ctrl/Cmd/средняя кнопка — как ссылка
         if (!SHELL_OK || e.defaultPrevented || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-        e.preventDefault(); shellOpen(game);
+        e.preventDefault(); shellOpen(game, e.currentTarget);
       });
     })(g);
     grid.appendChild(a);
@@ -1095,19 +1109,21 @@ render();
    игра внутри оболочки свою музыку не запускает, а шлёт залу сообщения (вкл/выкл музыки, следующий трек, пауза на время раунда, «в зал»).
    «Назад»: кнопка «Все игры» в игре, системная «назад» (history) и кнопка Telegram / MAX закрывают iframe. Адрес игры напрямую работает как раньше. ===== */
 var SHELL_OK = /^https?:$/.test(String(window.location.protocol)) && !!(window.history && history.pushState);
-var shellFrame = null, SHELL_OPEN = false;
+var shellFrame = null, SHELL_OPEN = false, shellOpener = null;
 function shellUrl(g) {
   var u = './' + g.slug + '/index.html' + (g.free ? '' : seasonParam);
   u += (u.indexOf('?') < 0 ? '?' : '&') + 'shell=1';
   return WDX.withParams(u);                  // параметры запуска VK / MAX / Telegram переходят в игру
 }
-function shellOpen(g) {
+function shellOpen(g, opener) {
   var f;
   if (shellFrame) return;
+  shellOpener = opener || null;
   f = document.createElement('iframe');
   f.className = 'shell-frame';
   f.setAttribute('allow', 'camera; microphone; autoplay; fullscreen');   // маске нужна камера
   f.setAttribute('title', g.title);
+  f.onload = function () { try { f.contentWindow.focus(); } catch (e) { /* клавиши сразу идут в игру */ } };
   f.src = shellUrl(g);
   document.body.appendChild(f);
   document.body.classList.add('shell-open');
@@ -1122,11 +1138,14 @@ function shellClose(fromPop) {
   try { shellFrame.parentNode.removeChild(shellFrame); } catch (e) { /* уже убран */ }
   shellFrame = null; SHELL_OPEN = false;
   document.body.classList.remove('shell-open');
+  try { if (shellOpener && shellOpener.focus) shellOpener.focus({ preventScroll: true }); } catch (e) { /* не страшно */ }
+  shellOpener = null;
   if (!fromPop) { try { if (history.state && history.state.wdxShell) history.back(); } catch (e) { /* не страшно */ } }
   render();                                  // попытки и серия могли измениться
   fitCards(); drawCards(clock);
 }
 window.addEventListener('popstate', function () { if (shellFrame) shellClose(true); });
+try { if (history.state && history.state.wdxShell) history.back(); } catch (e) { /* зал перезагрузили при открытой игре: лишняя запись истории не нужна */ }
 window.addEventListener('pageshow', render);
 document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
 
