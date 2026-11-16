@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Маска WeDrink</title>
-<meta name="description" content="Маска WeDrink: стакан бабл-ти на голове, новогодняя шапка и сырная пенка. Игра «Собери напиток» прямо в браузере телефона.">
+<meta name="description" content="Маска WeDrink: «Какой ты напиток?», стакан на голове и новогодний образ. Игра «Лови ингредиенты» прямо в браузере телефона.">
 <meta name="theme-color" content="#FBF7EC">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Маска WeDrink">
-<meta property="og:description" content="Стань бабл-ти: стакан на голове, тапиока в стакане, новогодний образ и игра «Собери напиток». Без установки.">
+<meta property="og:description" content="Узнай, какой ты напиток WeDrink: подними брови или открой рот. Стакан на голове, новогодний образ и игра. Без установки.">
 <meta property="og:image" content="https://holopi1.github.io/wedrink-games/assets/mascot-512.webp">
 <meta property="og:locale" content="ru_RU">
 <meta name="twitter:card" content="summary">
@@ -99,6 +99,35 @@ select,input[type=text]{width:100%;height:46px;border-radius:14px;border:2px sol
 @media (max-width:360px){#ordI canvas{width:36px;height:36px}#ordN{font-size:13px}#ordT{width:34px;height:34px;font-size:14px}#ordI{gap:4px}#order{gap:6px}}
 @media (max-height:600px){#sheet{gap:5px;padding-top:12px}#rscore{font-size:48px}#rBoard{padding:4px 10px 5px}#rList{font-size:12px}#sheet .tip{display:none}.mascot{width:68px}.screen{gap:7px}p{font-size:13px}#dots{bottom:calc(var(--safe-b) + 68px)}.dot{width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){.mascot{animation:none}.screen.on,#sheet.on{animation:none}#big.go{animation:none;opacity:1}}
+#hud .top{align-items:center}
+#hud .rt{display:flex;gap:8px;align-items:center}
+#score{display:none}
+#hud.game #score{display:flex}
+#snd.off #sndW{display:none}
+.dot img{width:36px;height:36px;object-fit:contain;display:block}
+.btn.ico{flex:none;width:50px;padding:0}
+#ctl .btn.ico{flex:none;max-width:50px}
+#gt{position:absolute;left:50%;top:calc(var(--safe-t) + 8px);transform:translateX(-50%);display:none;min-width:58px;height:44px;border-radius:22px;align-items:center;justify-content:center;background:var(--accent);color:#fff;border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);font-weight:900;font-size:22px;padding:0 12px}
+#hud.game #gt{display:flex}
+#gt.low{animation:pulse .5s ease-in-out infinite}
+@keyframes pulse{50%{transform:translateX(-50%) scale(1.14)}}
+#mods{position:absolute;left:10px;right:10px;top:calc(var(--safe-t) + 62px);display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:15px;border:3px solid var(--ink);background:#FFD23F;color:var(--ink);font-weight:900;font-size:13px;box-shadow:0 2px 0 var(--ink)}
+.chip.s{background:#BFE9F5}.chip.m{background:#FFB3BD}.chip.x{background:#FFD23F}
+#intro{position:absolute;left:12px;right:12px;top:27%;text-align:center;pointer-events:none;opacity:0}
+#intro b{display:block;font-size:clamp(24px,7.4vw,32px);line-height:1.08;font-weight:900;color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 var(--accent)}
+#intro i{display:block;margin-top:8px;font-style:normal;font-size:15px;font-weight:800;color:#fff;text-shadow:0 2px 0 var(--ink),0 0 8px rgba(0,0,0,.6)}
+#intro.go{animation:introA 2.1s ease-out forwards}
+@keyframes introA{0%{opacity:0;transform:translateY(16px) scale(.55)}12%{opacity:1;transform:scale(1.08)}20%{transform:scale(1)}84%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+#hud.game #dots,#hud.game #ctl{display:none}
+#hint{top:auto;bottom:calc(var(--safe-b) + 128px)}
+#pvImg{display:none;max-height:42vh;max-width:70%;aspect-ratio:9/16;object-fit:cover;border-radius:16px;border:3px solid var(--ink);box-shadow:0 4px 0 var(--ink)}
+#sheet.photo #pvImg{display:block}
+#sheet.photo #rscore,#sheet.photo #rBoard,#sheet.photo #rDrinks{display:none}
+#sheet .row .btn,#sheet .row a.btn{flex:1}
+#bBack{min-height:34px}
+@media (max-height:600px){#pvImg{max-height:34vh}#gt{height:40px;font-size:20px}#sheet .row .btn{min-height:42px}}
+@media (prefers-reduced-motion:reduce){#intro.go{animation:none;opacity:1}#gt.low{animation:none}}
 </style>
 </head>
 <body>
@@ -111,33 +140,35 @@ select,input[type=text]{width:100%;height:46px;border-radius:14px;border:2px sol
   <div id="tbar"></div>
   <div class="top">
     <a class="pill" id="back" href="../index.html" aria-label="Все игры">&larr;</a>
-    <div class="pill static" id="score"><span id="scoreN">0</span><small id="scoreM"></small></div>
+    <div class="rt">
+      <div class="pill static" id="score"><span id="scoreN">0</span></div>
+      <button class="pill" id="snd" type="button" aria-label="Звук"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#1F2A2A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="#1B8F8E"/><path id="sndW" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    </div>
   </div>
-  <div id="order">
-    <div id="ordT">40</div>
-    <div id="ordN"><small>Заказ</small><span id="ordName"></span></div>
-    <div id="ordI"></div>
-  </div>
+  <div id="gt">40</div>
+  <div id="mods"></div>
   <div id="combo"></div>
   <div id="big"></div>
+  <div id="intro"><b id="introT"></b><i id="introS"></i></div>
   <div id="hint"></div>
   <div id="dots" role="group" aria-label="Образ">
-    <button class="dot" type="button" data-o="A" aria-label="Я — бабл-ти"><svg viewBox="0 0 32 32"><path d="M20 3l-2 8" stroke="#1F2A2A" stroke-width="3.4" stroke-linecap="round"/><path d="M20 3l-2 8" stroke="#DC223C" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2 2"/><path d="M6 11h20l-2.4 17H8.4z" fill="#FBE4E7" stroke="#1F2A2A" stroke-width="2.4" stroke-linejoin="round"/><path d="M6.6 14h18.8l-.7 5H7.3z" fill="#DC223C"/><circle cx="12" cy="24" r="2" fill="#5B3A2F"/><circle cx="17" cy="25" r="2" fill="#5B3A2F"/><circle cx="21" cy="23.5" r="2" fill="#5B3A2F"/><path d="M5 11h22" stroke="#1F2A2A" stroke-width="3" stroke-linecap="round"/></svg></button>
-    <button class="dot" type="button" data-o="B" aria-label="Новогодний"><svg viewBox="0 0 32 32"><path d="M6 22C6 11 12 5 19 5c5 0 8 3 8 9l-3 8z" fill="#DC223C" stroke="#1F2A2A" stroke-width="2.4" stroke-linejoin="round"/><rect x="4" y="21" width="24" height="7" rx="3.5" fill="#fff" stroke="#1F2A2A" stroke-width="2.4"/><circle cx="26" cy="12" r="4" fill="#fff" stroke="#1F2A2A" stroke-width="2.4"/></svg></button>
-    <button class="dot" type="button" data-o="C" aria-label="Сырная пенка"><svg viewBox="0 0 32 32"><g fill="#FFF3D1" stroke="#1F2A2A" stroke-width="2.4"><circle cx="9" cy="17" r="6"/><circle cx="16" cy="12" r="7.5"/><circle cx="23" cy="17" r="6"/></g><g fill="#FFF3D1"><circle cx="9" cy="17" r="5"/><circle cx="16" cy="12" r="6.4"/><circle cx="23" cy="17" r="5"/><rect x="5" y="16" width="22" height="6"/></g><path d="M8 22v4.5a2.2 2.2 0 0 0 4.4 0V22M19 22v6a2.2 2.2 0 0 0 4.4 0v-6" fill="#FFF3D1" stroke="#1F2A2A" stroke-width="2.4" stroke-linejoin="round"/><path d="M5 22h22" stroke="#1F2A2A" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+    <button class="dot" type="button" data-o="A" aria-label="Мой напиток"><img alt="" src="assets/d_foam_peach.webp"></button>
+    <button class="dot" type="button" data-o="B" aria-label="Стакан на голове"><img alt="" src="assets/cup.webp"></button>
+    <button class="dot" type="button" data-o="C" aria-label="Новогодний"><img alt="" src="assets/hat.webp"></button>
   </div>
   <div id="ctl">
     <button class="btn" id="bPlay" type="button">Играть 40 с</button>
     <button class="btn sec" id="bPhoto" type="button">Фото</button>
+    <button class="btn sec ico" id="bFriend" type="button" aria-label="Позвать друга"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#156F6E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4M8.6 13.4l6.8 4"/></svg></button>
   </div>
 </div>
 
 <section class="screen on" id="sStart">
   <div class="brand">WeDrink<small>Новосибирск</small></div>
-  <img class="mascot" id="mascotImg" alt="Маскот WeDrink" src="data:image/webp;base64,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">
+  <img class="mascot" id="mascotImg" alt="Маскот WeDrink" src="assets/m_ura.webp">
   <h1>Маска WeDrink</h1>
-  <p>Стань бабл-ти: стакан на голове, новогодняя шапка или сырная пенка. А потом собери напиток из ингредиентов за 40 секунд.</p>
-  <div class="looks"><span>Стакан</span><span>Новый год</span><span>Пенка</span></div>
+  <p>Какой напиток ты сегодня? Подними брови или открой рот, и барабан выберет. А ещё стакан на голове, новогодний образ и игра: лови ртом ингредиенты.</p>
+  <div class="looks"><span>Мой напиток</span><span>Стакан</span><span>Новый год</span></div>
   <div class="muted" id="bestLine"></div>
   <div class="warn" id="inappWarn">Похоже, ты в приложении с встроенным браузером. Если камера не включится, открой ссылку в браузере телефона.</div>
   <div class="stack">
@@ -176,6 +207,7 @@ select,input[type=text]{width:100%;height:46px;border-radius:14px;border:2px sol
 
 <section id="sheet">
   <div class="t" id="rTitle">Раунд окончен</div>
+  <img id="pvImg" alt="Фото 9:16">
   <div id="rscore">0</div>
   <div id="rDrinks"></div>
   <div class="muted" id="rMeta"></div>
@@ -184,8 +216,11 @@ select,input[type=text]{width:100%;height:46px;border-radius:14px;border:2px sol
     <button class="btn" id="bAgain" type="button">Ещё раз</button>
     <button class="btn sec" id="bSave" type="button">Сохранить фото</button>
   </div>
-  <a class="btn ghost" href="../index.html">&larr; Все игры</a>
-  <div class="tip">Сними экран телефона, чтобы выложить ролик.</div>
+  <div class="row">
+    <button class="btn sec" id="bShare" type="button">Позвать друга</button>
+    <a class="btn sec" href="../index.html">&larr; Все игры</a>
+  </div>
+  <button class="btn ghost" id="bBack" type="button">Вернуться к маске</button>
 </section>
 
 <div id="toast"></div>
@@ -204,24 +239,22 @@ var ROUND = 40;            // секунд в раунде
 var DETECT_MS = 33;        // распознавание не чаще ~30 раз в секунду
 var MAX_DPR = 2;
 var STEP = 1 / 60;         // фиксированный шаг физики, не зависит от частоты кадров
-var STORE_KEY = 'wedrink.maska.v1';
+var STORE_KEY = 'wedrink.maska.v3';
 var TEAMS = ['AVTF','BIZ','FEN','FGO','FLA','FMA','FPMI','FTF','IST','MTF','REF','ARTREV','ENERGY','INTER','KIBER','KVN','OTRYAD','PROSTO','SOUS','SOVET','YETI'];
-var INK = '#1F2A2A', RED = '#DC223C', TEAL = '#1B8F8E', TEALD = '#156F6E', CREAM = '#FBF7EC', FOAM = '#FFF3D1';
+var INK = '#1F2A2A', RED = '#DC223C', TEAL = '#1B8F8E', TEALD = '#156F6E', CREAM = '#FBF7EC', GOLDC = '#FFD23F';
 var FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
-var LW = 0.034;            // толщина контура в долях размера лица
 var TAU = 6.2832;
 
 var $ = function(id){ return document.getElementById(id); };
 var qs = new URLSearchParams(location.search);
 var DEMO = qs.get('demo') === '1';
 var REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-
 var teamParam = (qs.get('g') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 8);
 var team = TEAMS.indexOf(teamParam) >= 0 ? teamParam : 'WEDRINK';
 
-/* ---------- Хранилище ---------- */
-var store = { best: {} };
-try { var o = JSON.parse(localStorage.getItem(STORE_KEY)); if (o && o.best) store = o; } catch (e) {}
+/* ---------- Хранилище (только в этом браузере) ---------- */
+var store = { top: [] };
+try { var so = JSON.parse(localStorage.getItem(STORE_KEY)); if (so && so.top) store = so; } catch (e) {}
 function saveStore(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
 
 /* ---------- Утилиты ---------- */
@@ -229,14 +262,106 @@ function lerp(a, b, t){ return a + (b - a) * t; }
 function clamp(v, a, b){ return v < a ? a : v > b ? b : v; }
 function rnd(a, b){ return a + Math.random() * (b - a); }
 function pick(a){ return a[Math.floor(Math.random() * a.length)]; }
-function hexToRgb(h){ var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
-function mixA(a, b, t){ return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
-function rgb(a, al){ return 'rgba(' + Math.round(a[0]) + ',' + Math.round(a[1]) + ',' + Math.round(a[2]) + ',' + (al === undefined ? 1 : al) + ')'; }
-function mix(h, h2, t){ return rgb(mixA(hexToRgb(h), hexToRgb(h2), t)); }
 function vibrate(p){ try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
 function toast(msg){ var t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove('on'); }, 2600); }
 function rr(c, x, y, w, h, r){ c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 function easeOutBack(t){ var c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+function easeOutBounce(t){ var n = 7.5625, d = 2.75; if (t < 1 / d) return n * t * t; if (t < 2 / d){ t -= 1.5 / d; return n * t * t + 0.75; } if (t < 2.5 / d){ t -= 2.25 / d; return n * t * t + 0.9375; } t -= 2.625 / d; return n * t * t + 0.984375; }
+function fitFont(g, txt, maxW, px, weight){ g.font = weight + ' ' + px + 'px ' + FONT; while (g.measureText(txt).width > maxW && px > 12){ px -= 2; g.font = weight + ' ' + px + 'px ' + FONT; } }
+function wrapText(g, txt, maxW){
+  var w = txt.split(' '), out = [], cur = '';
+  w.forEach(function(x){ var t = cur ? cur + ' ' + x : x; if (g.measureText(t).width > maxW && cur){ out.push(cur); cur = x; } else cur = t; });
+  if (cur) out.push(cur); return out;
+}
+
+/* ---------- Звук: короткие эффекты кодом, без файлов ---------- */
+var AC = null, muted = !!store.mute;
+function audioInit(){ try { if (!AC){ var C = window.AudioContext || window.webkitAudioContext; if (C) AC = new C(); } if (AC && AC.state === 'suspended') AC.resume(); } catch (e) {} }
+function tone(f0, f1, dur, type, vol, delay){
+  if (!AC || muted) return;
+  try {
+    var t = AC.currentTime + (delay || 0), o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.2, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur + 0.03);
+  } catch (e) {}
+}
+function noise(dur, vol, f0, f1, delay){
+  if (!AC || muted) return;
+  try {
+    var t = AC.currentTime + (delay || 0), n = Math.floor(AC.sampleRate * dur), b = AC.createBuffer(1, n, AC.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = b; f.type = 'bandpass'; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1 || f0, t + dur); f.Q.value = 1.2;
+    g.gain.value = vol; s.connect(f); f.connect(g); g.connect(AC.destination); s.start(t);
+  } catch (e) {}
+}
+var SFX = {
+  pop: function(){ tone(160, 560, 0.14, 'sine', 0.42); noise(0.07, 0.35, 1800, 900); },
+  whoosh: function(){ noise(0.32, 0.3, 400, 3000); },
+  tick: function(f){ tone(f || 700, (f || 700) * 0.7, 0.05, 'square', 0.1); },
+  win: function(){ tone(523, 523, 0.14, 'triangle', 0.3, 0); tone(659, 659, 0.14, 'triangle', 0.3, 0.1); tone(784, 784, 0.28, 'triangle', 0.32, 0.2); },
+  coin: function(i){ var f = 620 + i * 55; tone(f, f * 2, 0.12, 'triangle', 0.26); },
+  gold: function(){ tone(880, 1760, 0.12, 'triangle', 0.3); tone(1320, 2640, 0.2, 'triangle', 0.26, 0.09); },
+  bad: function(){ tone(220, 70, 0.28, 'sawtooth', 0.3); noise(0.12, 0.3, 900, 300); },
+  boost: function(){ tone(440, 880, 0.1, 'square', 0.16); tone(660, 1320, 0.16, 'square', 0.16, 0.08); },
+  glug: function(){ tone(300, 150, 0.09, 'sine', 0.22); },
+  splash: function(){ noise(0.18, 0.3, 1500, 600); },
+  jingle: function(){ [1047, 1319, 1568, 2093].forEach(function(f, i){ tone(f, f, 0.2, 'sine', 0.2, i * 0.07); }); },
+  go: function(){ tone(523, 1046, 0.22, 'square', 0.2); }
+};
+function setMuted(m){ muted = m; store.mute = m; saveStore(); $('snd').classList.toggle('off', m); }
+
+/* ---------- Изображения: настоящие фото продукции и маскота ---------- */
+var NAMES = ['cup','logo','hat','d_tapioca','d_double_milk','d_double_passion','d_blueberry_tea','d_raspberry_orange','d_lemonade','d_mango_snow','d_oreo_dessert','d_shake_strawberry','d_fruit_bucket','d_foam_peach','d_foam_strawberry','i_pearl','i_bean','i_coconut','i_lemon','i_oreo','i_peach','m_ura','m_vau','m_ogon','m_hmm','m_stile','m_zima_kofe','m_zima_snow','m_pyet'];
+var IM = {}, SP = {};
+NAMES.forEach(function(n){ var im = new Image(); im.onload = function(){ IM[n] = im; if (n === 'cup') makeGhost(); if (n === 'd_tapioca') makeGold(); }; im.src = 'assets/' + n + '.webp'; });
+function asp(k){ var im = IM[k]; return im ? im.height / im.width : 1; }
+function dimg(g, k, x, y, w, h, rot, al){
+  var im = SP[k] || IM[k]; if (!im) return;
+  if (h === undefined) h = w * im.height / im.width;
+  g.save(); g.translate(x, y); if (rot) g.rotate(rot); if (al !== undefined) g.globalAlpha *= al;
+  g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
+}
+function mkc(w, h, fn){ var c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); return c; }
+function makeGhost(){
+  var im = IM.cup; SP.ghost = mkc(im.width, im.height, function(g, w, h){ g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(0, 0, w, h); });
+}
+function makeGold(){
+  var im = IM.d_tapioca; SP.gold = mkc(im.width, im.height, function(g, w, h){
+    g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-atop';
+    var gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, 'rgba(255,236,120,.78)'); gr.addColorStop(0.5, 'rgba(255,190,40,.6)'); gr.addColorStop(1, 'rgba(255,225,100,.78)');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  });
+}
+function badge(col, fn){
+  return mkc(100, 100, function(g){
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(50, 50, 48, 0, TAU); g.fill();
+    g.fillStyle = col; g.beginPath(); g.arc(50, 50, 41, 0, TAU); g.fill(); g.lineWidth = 3.5; g.strokeStyle = INK; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.4)'; g.beginPath(); g.ellipse(36, 30, 14, 7, -0.6, 0, TAU); g.fill();
+    fn(g);
+  });
+}
+function flake(g, cx, cy, r, lw, col){
+  g.strokeStyle = col; g.lineWidth = lw;
+  for (var a = 0; a < 3; a++){ var an = a * Math.PI / 3, c = Math.cos(an), s = Math.sin(an); g.beginPath(); g.moveTo(cx + c * r, cy + s * r); g.lineTo(cx - c * r, cy - s * r); g.stroke(); }
+}
+SP.slow = badge('#BFE9F5', function(g){ flake(g, 50, 50, 22, 9, INK); flake(g, 50, 50, 22, 4.5, '#fff'); });
+SP.mag = badge('#FFB3BD', function(g){
+  g.lineWidth = 15; g.strokeStyle = INK; g.beginPath(); g.arc(50, 52, 17, Math.PI, 0); g.lineTo(67, 70); g.moveTo(33, 52); g.lineTo(33, 70); g.stroke();
+  g.lineWidth = 8; g.strokeStyle = RED; g.stroke();
+  g.lineWidth = 8; g.strokeStyle = '#fff'; g.beginPath(); g.moveTo(33, 66); g.lineTo(33, 72); g.moveTo(67, 66); g.lineTo(67, 72); g.stroke();
+});
+SP.x2 = badge(GOLDC, function(g){ g.font = '900 38px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 7; g.strokeStyle = INK; g.strokeText('×2', 50, 54); g.fillStyle = '#fff'; g.fillText('×2', 50, 54); });
+SP.ice = mkc(100, 108, function(g){
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  function hex(r, cx, cy){ g.beginPath(); for (var i = 0; i < 6; i++){ var a = Math.PI / 6 + i * Math.PI / 3; g[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); }
+  hex(48, 50, 54); g.fillStyle = '#fff'; g.fill();
+  hex(40, 50, 54); var gr = g.createLinearGradient(20, 14, 80, 94); gr.addColorStop(0, '#E6F7FF'); gr.addColorStop(1, '#7FC8EE'); g.fillStyle = gr; g.fill(); g.lineWidth = 3.5; g.strokeStyle = INK; g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3; g.beginPath(); g.moveTo(50, 54); g.lineTo(50, 14); g.moveTo(50, 54); g.lineTo(84, 74); g.moveTo(50, 54); g.lineTo(16, 74); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.ellipse(34, 36, 9, 5, -0.7, 0, TAU); g.fill();
+});
 
 /* ---------- Экраны ---------- */
 var screens = { start: $('sStart'), load: $('sLoad'), err: $('sErr'), pause: $('sPause') };
@@ -245,8 +370,6 @@ function showScreen(name){
   $('hud').classList.toggle('on', name === null);
 }
 function hideScreens(){ showScreen(null); }
-
-/* ---------- Встроенные браузеры ---------- */
 var UA = navigator.userAgent || '';
 var IN_APP = /Telegram|VKApp|VK\/|FBAN|FBAV|FB_IAB|Instagram|Line\/|MicroMessenger|Snapchat|TikTok|musical_ly|WhatsApp|OKApp|YaApp|; wv\)/i.test(UA) ||
   (/iPhone|iPad|iPod/.test(UA) && !/Safari\//.test(UA));
@@ -254,10 +377,10 @@ function pageLink(){
   var base = location.href.split('#')[0].split('?')[0];
   return team !== 'WEDRINK' ? base + '?g=' + team : base;
 }
+if (IN_APP) $('inappWarn').classList.add('on');
 
-/* ---------- Рекорды (локально) ---------- */
+/* ---------- Лучшие результаты (локально) ---------- */
 function bestOf(){ return (store.top && store.top[0] && store.top[0].s) || 0; }
-function refreshBest(){}
 function addResult(sc){
   if (!store.top) store.top = [];
   var d = new Date(), ds = ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2);
@@ -265,26 +388,26 @@ function addResult(sc){
   store.top.push(e); store.top.sort(function(a, b){ return b.s - a.s || b.n - a.n; }); store.top = store.top.slice(0, 5); saveStore();
   return e;
 }
-if (IN_APP) $('inappWarn').classList.add('on');
+// Общий рейтинг подключится, когда появится сервер. Сейчас функция ничего не отправляет.
+function submitScore(score){ return score; }
+function refreshBest(){ var b = bestOf(); $('bestLine').textContent = b ? 'Твой рекорд: ' + b : ''; }
+refreshBest();
 
 /* ---------- Образы ---------- */
 var OUTFITS = ['A', 'B', 'C'];
-var HINTS = {
-  A: 'Открой рот — тапиока полетит в рот',
-  B: 'Открой рот — пойдёт пар от горячего чая',
-  C: 'Сделай глоток: открой и закрой рот'
+var INTRO = {
+  A: ['Подними брови или открой рот', 'и барабан выберет твой напиток'],
+  B: ['Наклони голову: стакан плещется', 'Открой рот: пей через трубочку'],
+  C: ['Открой рот: вылетят снежинки', 'с ингредиентами'],
+  G: ['Лови ртом ингредиенты', 'Открой рот под предметом']
 };
-function defaultOutfit(){
-  var d = new Date(), m = d.getMonth(), day = d.getDate();
-  return ((m === 11 && day >= 15) || (m === 0 && day <= 14)) ? 'B' : 'A';
-}
+function defaultOutfit(){ return 'A'; }
 var outfit = (function(){
   var q = (qs.get('outfit') || '').toUpperCase();
   if (OUTFITS.indexOf(q) >= 0) return q;
   if (store.outfit && OUTFITS.indexOf(store.outfit) >= 0) return store.outfit;
   return defaultOutfit();
 })();
-var swapT = 1;
 
 /* ---------- Холст ---------- */
 var canvas = $('stage'), ctx = canvas.getContext('2d');
@@ -302,16 +425,12 @@ addEventListener('resize', resize);
 addEventListener('orientationchange', function(){ setTimeout(resize, 200); });
 resize();
 
-var mascot = new Image(); var mascotOK = false;
-mascot.onload = function(){ mascotOK = true; }; mascot.src = $('mascotImg').getAttribute('src');
-
 /* ---------- Поза лица ---------- */
 function pt(x, y){ return { x: x || 0, y: y || 0 }; }
-var KEYS = ['eL', 'eR', 'fore', 'chin', 'mouth', 'chL', 'chR'];
-var T = { has: false, jaw: 0 }, P = { jaw: 0, alpha: 0, s: 100, rot: 0, has: false, lost: 0 };
+var KEYS = ['eL', 'eR', 'fore', 'chin', 'mouth'];
+var T = { has: false, jaw: 0, brow: 0 }, P = { jaw: 0, brow: 0, alpha: 0, s: 100, rot: 0, has: false, lost: 0, crown: -0.72, ex: 0, ey: 0 };
 KEYS.forEach(function(k){ T[k] = pt(); P[k] = pt(); });
 var firstFace = true;
-
 var vm = { ox: 0, oy: 0, dw: W, dh: H };
 function updateVM(){
   var vw = video.videoWidth || 640, vh = video.videoHeight || 480;
@@ -322,6 +441,7 @@ function mapP(l){ return { x: W - (vm.ox + l.x * vm.dw), y: vm.oy + l.y * vm.dh 
 function mid(a, b){ return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
 
 var landmarker = null, delegateUsed = 'GPU', detErr = 0, lastDet = 0, lastVT = -1;
+function bsScore(bs, name){ for (var i = 0; i < bs.length; i++){ if (bs[i].categoryName === name) return bs[i].score; } return 0; }
 function detect(now){
   if (!landmarker || now - lastDet < DETECT_MS) return;
   if (video.readyState < 2 || video.currentTime === lastVT) return;
@@ -336,16 +456,15 @@ function detect(now){
   var a = mid(m(33), m(133)), b = mid(m(362), m(263));
   if (a.x <= b.x){ T.eL = a; T.eR = b; } else { T.eL = b; T.eR = a; }
   T.fore = m(10); T.chin = m(152); T.mouth = mid(m(13), m(14));
-  var c1 = m(205), c2 = m(425), nose = m(1);
-  c1 = { x: lerp(c1.x, nose.x, 0.08), y: lerp(c1.y, nose.y, 0.08) }; c2 = { x: lerp(c2.x, nose.x, 0.08), y: lerp(c2.y, nose.y, 0.08) };
-  if (c1.x <= c2.x){ T.chL = c1; T.chR = c2; } else { T.chL = c2; T.chR = c1; }
-  var jaw = null, bs = res.faceBlendshapes && res.faceBlendshapes[0];
-  if (bs && bs.categories){ for (var i = 0; i < bs.categories.length; i++){ if (bs.categories[i].categoryName === 'jawOpen'){ jaw = bs.categories[i].score; break; } } }
-  if (jaw === null){
+  var jaw = null, brow = 0, bs = res.faceBlendshapes && res.faceBlendshapes[0];
+  if (bs && bs.categories){
+    jaw = bsScore(bs.categories, 'jawOpen');
+    brow = Math.max(bsScore(bs.categories, 'browInnerUp'), (bsScore(bs.categories, 'browOuterUpLeft') + bsScore(bs.categories, 'browOuterUpRight')) / 2);
+  } else {
     var gap = Math.hypot(f[13].x - f[14].x, f[13].y - f[14].y), fh = Math.hypot(f[10].x - f[152].x, f[10].y - f[152].y) || 1;
     jaw = clamp(gap / fh * 6, 0, 1);
   }
-  T.jaw = jaw; T.has = true;
+  T.jaw = jaw; T.brow = brow; T.has = true;
 }
 function switchToCpu(){
   delegateUsed = 'CPU';
@@ -360,679 +479,655 @@ function makeLandmarker(delegate){
   });
 }
 
-/* ---------- Ингредиенты: рисуются кодом, наклейки с белой каймой ---------- */
-function circP(x, y, r){ return function(g){ g.moveTo(x + r, y); g.arc(x, y, r, 0, TAU); }; }
-function mkSprite(parts, base, paint){
-  var c = document.createElement('canvas'); c.width = c.height = 96; var g = c.getContext('2d');
-  g.translate(48, 48); g.lineJoin = 'round'; g.lineCap = 'round';
-  g.strokeStyle = '#fff'; g.fillStyle = '#fff'; g.lineWidth = 15;
-  parts.forEach(function(p){ g.beginPath(); p(g); g.stroke(); g.fill(); });
-  g.strokeStyle = INK; g.lineWidth = 9;
-  parts.forEach(function(p){ g.beginPath(); p(g); g.stroke(); });
-  g.fillStyle = base;
-  parts.forEach(function(p){ g.beginPath(); p(g); g.fill(); });
-  if (paint) paint(g);
-  return c;
-}
-function hl(g, x, y, rx, ry, rot, col){ g.fillStyle = col || 'rgba(255,255,255,.75)'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, TAU); g.fill(); }
-function star4(g, r){ g.moveTo(0, -r); g.quadraticCurveTo(r * 0.18, -r * 0.18, r, 0); g.quadraticCurveTo(r * 0.18, r * 0.18, 0, r); g.quadraticCurveTo(-r * 0.18, r * 0.18, -r, 0); g.quadraticCurveTo(-r * 0.18, -r * 0.18, 0, -r); g.closePath(); }
-function heartP(g, r){ g.moveTo(0, r * 0.9); g.bezierCurveTo(-r * 1.25, r * 0.05, -r * 0.8, -r * 0.85, 0, -r * 0.35); g.bezierCurveTo(r * 0.8, -r * 0.85, r * 1.25, r * 0.05, 0, r * 0.9); g.closePath(); }
-
-var SPR = {};
-SPR.tapioca = mkSprite([circP(0, 0, 27)], '#5B3A2F', function(g){ hl(g, -9, -10, 9, 5, -0.6, '#A07463'); hl(g, -15, -5, 2.6, 2.6, 0, '#fff'); });
-SPR.coconut = mkSprite([function(g){ rr(g, -26, -26, 52, 52, 12); }], '#F4FAF8', function(g){
-  g.fillStyle = '#D3ECE8'; g.beginPath(); g.moveTo(26, -4); g.lineTo(26, 14); g.quadraticCurveTo(26, 26, 14, 26); g.lineTo(-12, 26); g.lineTo(-12, 16); g.lineTo(14, 16); g.quadraticCurveTo(26, 16, 26, 4); g.closePath(); g.fill();
-  g.fillStyle = '#fff'; rr(g, -18, -19, 18, 6, 3); g.fill();
-  g.fillStyle = '#9DD2CB'; [[10, 4, 3], [-8, 10, 2.4], [12, -10, 2.2]].forEach(function(b){ g.beginPath(); g.arc(b[0], b[1], b[2], 0, TAU); g.fill(); });
-});
-SPR.beans = mkSprite([function(g){ g.moveTo(-28, -4); g.bezierCurveTo(-30, -22, 0, -26, 22, -14); g.bezierCurveTo(36, -6, 32, 16, 14, 22); g.bezierCurveTo(-6, 28, -30, 14, -28, -4); g.closePath(); }], '#B3172E', function(g){
-  hl(g, -8, -9, 9, 3.6, -0.35, '#E8566B');
-  g.strokeStyle = '#F6D9C4'; g.lineWidth = 3.5; g.beginPath(); g.moveTo(4, 14); g.quadraticCurveTo(15, 11, 20, 3); g.stroke();
-});
-SPR.oreo = mkSprite([function(g){ for (var i = 0; i <= 28; i++){ var a = i / 28 * TAU, r = 27 + (i % 2 ? 2.5 : 0); var x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) g.lineTo(x, y); else g.moveTo(x, y); } g.closePath(); }], '#3A2B2B', function(g){
-  g.strokeStyle = '#6F5656'; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 19, 0, TAU); g.stroke();
-  g.fillStyle = '#6F5656'; for (var i = 0; i < 8; i++){ var a = i * TAU / 8; g.beginPath(); g.arc(Math.cos(a) * 23.5, Math.sin(a) * 23.5, 1.7, 0, TAU); g.fill(); }
-  g.fillStyle = '#fff'; g.font = '900 13px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('OREO', 0, 1);
-});
-SPR.foam = mkSprite([circP(-14, 6, 14), circP(2, -4, 17), circP(16, 6, 14), circP(0, 10, 15)], FOAM, function(g){
-  g.fillStyle = '#F2DAA0'; g.beginPath(); g.ellipse(2, 18, 20, 5.5, 0, 0, Math.PI); g.fill();
-  hl(g, -6, -12, 7, 3.6, -0.5); hl(g, 12, -2, 2.4, 2.4, 0, '#fff');
-});
-SPR.peach = mkSprite([function(g){ g.moveTo(-31, 4); g.quadraticCurveTo(0, -42, 31, 4); g.quadraticCurveTo(0, -4, -31, 4); g.closePath(); }], '#FFC08E', function(g){
-  g.strokeStyle = '#F0694E'; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(-28, 1); g.quadraticCurveTo(0, -37, 28, 1); g.stroke();
-  hl(g, -8, -12, 8, 2.6, -0.2);
-});
-SPR.orange = mkSprite([function(g){ g.moveTo(-31, 8); g.arc(0, 8, 31, Math.PI, TAU); g.closePath(); }], '#FF9A2B', function(g){
-  g.fillStyle = '#FFC45E'; g.beginPath(); g.moveTo(-23, 8); g.arc(0, 8, 23, Math.PI, TAU); g.closePath(); g.fill();
-  g.strokeStyle = '#FFF4D6'; g.lineWidth = 2.6; g.beginPath();
-  [-155, -125, -90, -55, -25].forEach(function(d){ var a = d * Math.PI / 180; g.moveTo(0, 8); g.lineTo(Math.cos(a) * 23, 8 + Math.sin(a) * 23); }); g.stroke();
-});
-SPR.grape = mkSprite([circP(-12, 7, 15), circP(12, 7, 15), circP(0, -8, 15), circP(0, 17, 13)], '#7B5BD3', function(g){
-  [[-12, 7], [12, 7], [0, -8], [0, 17]].forEach(function(b){ hl(g, b[0] - 5, b[1] - 5, 4.6, 2.6, -0.6, '#B7A2F0'); });
-  g.strokeStyle = INK; g.lineWidth = 3.4; g.beginPath(); g.moveTo(0, -22); g.quadraticCurveTo(2, -29, 6, -31); g.stroke();
-  g.fillStyle = '#43B26B'; g.beginPath(); g.ellipse(11, -28, 9, 4.6, -0.35, 0, TAU); g.fill(); g.stroke();
-});
-SPR.strawberry = mkSprite([function(g){ g.moveTo(0, 32); g.bezierCurveTo(-22, 22, -32, 0, -26, -14); g.bezierCurveTo(-20, -26, -6, -22, 0, -18); g.bezierCurveTo(6, -22, 20, -26, 26, -14); g.bezierCurveTo(32, 0, 22, 22, 0, 32); g.closePath(); }], '#E8334A', function(g){
-  g.fillStyle = '#FFE27A'; [[-12, -4], [0, -6], [12, -4], [-8, 8], [6, 8], [-1, 19], [-17, 6], [17, 6]].forEach(function(p){ g.beginPath(); g.ellipse(p[0], p[1], 1.9, 2.8, 0, 0, TAU); g.fill(); });
-  g.fillStyle = '#43B26B'; g.strokeStyle = INK; g.lineWidth = 3; g.beginPath();
-  g.moveTo(0, -17); g.lineTo(-10, -30); g.lineTo(-4, -20); g.lineTo(-18, -22); g.lineTo(-6, -14); g.lineTo(-14, -8); g.lineTo(0, -12); g.lineTo(14, -8); g.lineTo(6, -14); g.lineTo(18, -22); g.lineTo(4, -20); g.lineTo(10, -30); g.closePath(); g.fill(); g.stroke();
-});
-SPR.lemon = mkSprite([function(g){ g.ellipse(0, 0, 30, 21, -0.45, 0, TAU); }, circP(27, -14, 5.5), circP(-27, 14, 5.5)], '#FFDF45', function(g){
-  hl(g, -7, -8, 12, 3.8, -0.45, '#FFF6A8');
-  g.strokeStyle = '#F2BC1B'; g.lineWidth = 3.4; g.beginPath(); g.ellipse(0, 0, 24, 15, -0.45, 0.4, 1.9); g.stroke();
-});
-SPR.tea = mkSprite([function(g){ g.moveTo(-30, 18); g.bezierCurveTo(-28, -20, 8, -34, 30, -26); g.bezierCurveTo(30, 2, 6, 30, -30, 18); g.closePath(); }], '#43B26B', function(g){
-  g.strokeStyle = INK; g.lineWidth = 3.4; g.beginPath(); g.moveTo(-27, 16); g.quadraticCurveTo(0, 4, 24, -20); g.stroke();
-  g.strokeStyle = '#2C8A4E'; g.lineWidth = 2.6; g.beginPath();
-  [[-14, 11, -6, 20], [-2, 5, 4, 16], [9, -3, 14, 6], [-12, 8, -14, -6], [0, -2, -2, -16], [12, -12, 14, -22]].forEach(function(v){ g.moveTo(v[0], v[1]); g.lineTo(v[2], v[3]); }); g.stroke();
-  hl(g, -12, -8, 8, 2.6, -0.7);
-});
-var SIL = {};
-Object.keys(SPR).forEach(function(k){
-  var c = document.createElement('canvas'); c.width = c.height = 96; var g = c.getContext('2d');
-  g.drawImage(SPR[k], 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(190,204,203,.95)'; g.fillRect(0, 0, 96, 96);
-  SIL[k] = c;
-});
-var ING_KEYS = ['tapioca', 'coconut', 'beans', 'oreo', 'foam', 'peach', 'orange', 'grape', 'strawberry', 'lemon', 'tea'];
-
-/* Заказы: названия и состав — из menu_data.py (названия без объёма и цены) */
-var ORDERS = [
-  { name: 'Двойной молочный чай', col: '#C99A6B', v: [['tea', 'tapioca', 'coconut'], ['tea', 'tapioca', 'beans'], ['tea', 'coconut', 'beans']] },
-  { name: 'Молочный чай с персиком', col: '#F4B98A', v: [['tea', 'peach', 'coconut']] },
-  { name: 'Виноградно-лимонный чай', col: '#B79BD6', v: [['tea', 'grape', 'lemon']] },
-  { name: 'Чай «Шесть виноградин»', col: '#9C7BC9', v: [['tea', 'grape', 'peach']] },
-  { name: 'Клубничный чай с сырной пенкой', col: '#F28AA0', foam: true, v: [['tea', 'peach', 'foam']] },
-  { name: 'Персиковый чай с сырной пенкой', col: '#F7B27A', foam: true, v: [['tea', 'peach', 'foam']] },
-  { name: 'Клубничный милкшейк', col: '#F7A6B8', v: [['tea', 'strawberry', 'coconut']] },
-  { name: 'Тон Тон «Молочный босс»', col: '#D9B48A', v: [['tapioca', 'peach', 'coconut']] },
-  { name: 'Коктейль «Двойная маракуйя»', col: '#F5C842', v: [['tea', 'tapioca', 'coconut']] }
-];
-function makeOrder(i){ var o = ORDERS[i]; return { i: i, name: o.name, col: o.col, foam: !!o.foam, ing: pick(o.v).slice(), got: [] }; }
-
-/* ---------- Логотип WEDRINK (наклейка) ---------- */
-function fitFont(g, txt, maxW, px, weight){
-  g.font = (weight || 900) + ' ' + px + 'px ' + FONT;
-  var w = g.measureText(txt).width; if (w > maxW){ px = px * maxW / w; g.font = (weight || 900) + ' ' + px + 'px ' + FONT; }
-  return px;
-}
-function drawLogo(g, cx, cy, w, tilt){
-  var h = w * 0.3;
-  g.save(); g.translate(cx, cy); g.rotate(tilt || 0); g.lineJoin = 'round';
-  g.fillStyle = '#fff'; g.strokeStyle = '#fff'; g.lineWidth = h * 0.2; rr(g, -w / 2, -h / 2, w, h, h * 0.3); g.stroke();
-  rr(g, -w / 2, -h / 2, w, h, h * 0.3); g.fillStyle = RED; g.fill(); g.lineWidth = Math.max(2, h * 0.09); g.strokeStyle = INK; g.stroke();
-  g.fillStyle = 'rgba(255,255,255,.28)'; rr(g, -w / 2 + h * 0.18, -h / 2 + h * 0.12, w * 0.42, h * 0.14, h * 0.07); g.fill();
-  g.textAlign = 'center'; g.textBaseline = 'middle'; fitFont(g, 'WEDRINK', w * 0.82, h * 0.62);
-  g.lineWidth = h * 0.05; g.strokeStyle = 'rgba(100,0,16,.5)'; g.strokeText('WEDRINK', 0, h * 0.05);
-  g.fillStyle = '#fff'; g.fillText('WEDRINK', 0, h * 0.03);
-  g.restore();
-}
-
-/* ---------- Новогодняя шапка (начало координат — центр отворота) ---------- */
-function santaHat(g, pa, lw, code, mini){
-  g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
-  var body = function(){
-    g.beginPath(); g.moveTo(-0.6, -0.1);
-    g.bezierCurveTo(-0.68, -0.55, -0.42, -0.9, 0.0, -0.92);
-    g.bezierCurveTo(0.42, -0.94, 0.8, -0.74, 0.88, -0.34);
-    g.bezierCurveTo(0.8, -0.28, 0.7, -0.36, 0.6, -0.5);
-    g.bezierCurveTo(0.57, -0.34, 0.6, -0.2, 0.6, -0.1); g.closePath();
-  };
-  body(); g.fillStyle = RED; g.fill();
-  g.save(); body(); g.clip();
-  g.strokeStyle = 'rgba(110,0,20,.32)'; g.lineWidth = 0.13; g.beginPath(); g.moveTo(0.95, -0.2); g.bezierCurveTo(0.5, -0.3, 0.45, -0.7, 0.05, -1.0); g.stroke();
-  g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 0.055; g.beginPath(); g.moveTo(-0.5, -0.22); g.bezierCurveTo(-0.55, -0.5, -0.38, -0.75, -0.16, -0.82); g.stroke();
-  g.restore();
-  body(); g.lineWidth = lw; g.strokeStyle = INK; g.stroke();
-  // помпон на кончике, качается
-  var px = 0.88 + Math.sin(pa) * 0.09, py = -0.3 + (Math.cos(pa) - 1) * 0.09 + 0.1;
-  var pb = [[px, py, 0.125], [px - 0.085, py + 0.03, 0.085], [px + 0.085, py + 0.03, 0.085], [px, py - 0.085, 0.085], [px, py + 0.09, 0.085]];
-  g.strokeStyle = INK; g.lineWidth = lw * 2; pb.forEach(function(b){ g.beginPath(); g.arc(b[0], b[1], b[2], 0, TAU); g.stroke(); });
-  g.fillStyle = '#fff'; pb.forEach(function(b){ g.beginPath(); g.arc(b[0], b[1], b[2], 0, TAU); g.fill(); });
-  g.strokeStyle = '#E3DCCB'; g.lineWidth = lw * 0.6; g.beginPath(); g.arc(px + 0.02, py + 0.02, 0.07, 0.2, 1.6); g.stroke();
-  // отворот
-  rr(g, -0.67, -0.17, 1.34, 0.34, 0.15); g.fillStyle = '#fff'; g.fill(); g.lineWidth = lw; g.strokeStyle = INK; g.stroke();
-  if (!mini){
-    g.save(); g.translate(0, 0.012); g.scale(0.01, 0.01); g.textAlign = 'center'; g.textBaseline = 'middle';
-    fitFont(g, 'WEDRINK', 112, 25); g.fillStyle = RED; g.fillText('WEDRINK', 0, 1); g.restore();
-    if (code && code !== 'WEDRINK'){
-      g.save(); g.translate(-0.3, -0.52); g.rotate(-0.25);
-      g.fillStyle = '#fff'; g.beginPath(); g.arc(0, 0, 0.14, 0, TAU); g.fill(); g.lineWidth = lw * 0.8; g.strokeStyle = INK; g.stroke();
-      g.scale(0.01, 0.01); g.textAlign = 'center'; g.textBaseline = 'middle'; fitFont(g, code, 21, 15); g.fillStyle = TEALD; g.fillText(code, 0, 1);
-      g.restore();
-    }
-  }
-  g.restore();
-}
-
-/* ---------- Маскот в углу и на плече ---------- */
-var mas = { jump: 0, sad: 0, big: 0 };
-function mascotJump(big){ mas.jump = 1; mas.big = big ? 1 : 0; mas.sad = 0; }
-function mascotSad(){ mas.sad = 1; mas.jump = 0; }
-function drawMascot(g, cx, bottom, size, hat, sad, jump, big, t){
-  if (!mascotOK) return;
-  g.save(); g.translate(cx, bottom);
-  var lift = jump > 0 ? Math.abs(Math.sin(Math.PI * (1 - jump))) * size * (big ? 0.55 : 0.32) : 0;
-  var sq = jump > 0 ? 1 + Math.sin(Math.PI * (1 - jump) * 2) * 0.06 : 1;
-  g.translate(0, -lift); g.rotate(sad ? Math.sin(t * 40) * 0.05 : (REDUCED ? 0 : Math.sin(t * 1.7) * 0.05)); g.scale(1 / sq, sq);
-  g.drawImage(mascot, -size / 2, -size, size, size);
-  if (sad){
-    var ex = [-0.135, 0.15], ey = -0.615;
-    ex.forEach(function(x, i){
-      g.fillStyle = '#fff'; g.beginPath(); g.ellipse(x * size, ey * size, size * 0.115, size * 0.125, 0, 0, TAU); g.fill();
-      g.strokeStyle = INK; g.lineWidth = size * 0.032; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
-      var dir = i ? -1 : 1; g.moveTo((x - 0.07 * dir) * size, (ey - 0.05) * size); g.lineTo((x + 0.06 * dir) * size, ey * size); g.lineTo((x - 0.07 * dir) * size, (ey + 0.05) * size); g.stroke();
-    });
-    g.fillStyle = '#7a1f2b'; g.beginPath(); g.ellipse(0.01 * size, -0.43 * size, size * 0.05, size * 0.03, 0, 0, TAU); g.fill();
-  }
-  if (hat){
-    g.save(); g.translate(0.01 * size, -0.78 * size); g.rotate(-0.12); var k = size * 0.5; g.scale(k, k);
-    santaHat(g, Math.sin(t * 2.2) * 0.35, 0.06, '', true); g.restore();
-  }
-  g.restore();
-}
-
 /* ---------- Состояние ---------- */
-var state = 'idle';   // idle (просто маска) | countdown | round | result
-var items = [], parts = [], snowB = [], snowF = [], cup = [], cupRespawn = [], drips = [];
-var score = 0, drinks = 0, combo = 0, tRound = 0, cdT = 0, spawnT = 0, popT = 0, shakeT = 0, flashT = 0, hintT = 0;
-var order = null, orderPause = 0, lastScore = null, lastDrinks = 0, idleI = 2, idleSips = 0;
-var fillT = 0, glowBoost = 0, happyT = 0, mustT = 0, mouthOpen = false, mouthOpenT = 0;
-var gameActive = false, paused = false, firstFace = true;
-var clock = 0, acc = 0, lastT = performance.now();
-var drinkRGB = hexToRgb(ORDERS[0].col), strawA = 0, strawV = 0, pomA = 0, pomV = 0, slosh = 0, sloshV = 0, sipT = 0, stFlag = 0;
+var state = 'idle';              // idle | countdown | round | result
+var gameActive = false, paused = false, clock = 0, lastT = 0, acc = 0, entT = 0, entFlag = 0;
+var mouthOpen = false, mouthOpenT = 0, trigHeld = false, trigCool = 0;
 var hk = { x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, init: false };
-var CUP = { top: -0.78, floor: 1.0, bot: 1.36 };
-
-/* ---------- Лицо в локальных координатах ---------- */
-function f2w(x, y){ var c = Math.cos(P.rot), s = Math.sin(P.rot); return { x: P.ex + (x * c - y * s) * P.s, y: P.ey + (x * s + y * c) * P.s }; }
-function faceBegin(){ ctx.save(); ctx.translate(P.ex, P.ey); ctx.rotate(P.rot); ctx.scale(P.s, P.s); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; }
-function unionBlobs(g, bl, fill, lw){
-  g.strokeStyle = INK; g.lineWidth = lw * 2; bl.forEach(function(b){ g.beginPath(); g.arc(b[0], b[1], b[2], 0, TAU); g.stroke(); });
-  g.fillStyle = fill; bl.forEach(function(b){ g.beginPath(); g.arc(b[0], b[1], b[2], 0, TAU); g.fill(); });
-}
+var parts = [], items = [], snow = [];
+var score = 0, dispScore = 0, streak = 0, comboT = 0, mult = 1, timeLeft = ROUND, elapsed = 0, spawnT = 0, cdT = 0, cdLast = 0;
+var x2T = 0, slowT = 0, magT = 0, freezeT = 0, caught = 0, goldN = 0, shakeT = 0, flashT = 0, popT = 0;
+var lastScore = null, lastDrinks = 0, hintT = 0, introT = 0;
+var ext = 9999, photoMode = false, photoBlob = null, photoURL = null;
+var mas = { jump: 0, tmp: null, tmpT: 0, y: 0 };
+function mascotJump(key){ mas.jump = 1; if (key){ mas.tmp = key; mas.tmpT = 1.6; } }
+function mascotMood(key, secs){ mas.tmp = key; mas.tmpT = secs; }
 
 /* ---------- Частицы ---------- */
-function addPart(o){
-  if (parts.length >= (REDUCED ? 90 : 260)) return;
-  o.life = 0; o.t = o.t || 'dot'; o.g = o.g || 0; o.vx = o.vx || 0; o.vy = o.vy || 0; o.rot = o.rot || 0; o.vr = o.vr || 0; o.gr = o.gr || 0; o.max = o.max || 1;
-  parts.push(o);
-}
-function burst(x, y, col, n){
-  if (REDUCED) n = Math.ceil(n / 3);
-  for (var i = 0; i < n; i++){ var a = rnd(0, TAU), v = rnd(70, 230); addPart({ x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 50, max: rnd(0.4, 0.75), r: rnd(2.5, 5), col: col, g: 420 }); }
+function addP(o){ if (parts.length > 280) parts.shift(); o.age = 0; parts.push(o); }
+function burstSpr(x, y, keys, n, spd, size){
+  for (var i = 0; i < n; i++){ var a = rnd(-Math.PI * 0.95, -Math.PI * 0.05), sp = rnd(0.45, 1) * spd;
+    addP({ t: 'spr', k: pick(keys), x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 900, rot: rnd(0, TAU), vr: rnd(-8, 8), max: rnd(1, 1.6), sz: size * rnd(0.8, 1.2) }); }
 }
 function confetti(x, y, n){
-  var cols = [RED, TEAL, '#fff', '#FFD36B', '#FF8FA3', TEALD];
-  if (REDUCED) n = Math.ceil(n / 3);
-  for (var i = 0; i < n; i++){ var a = rnd(-Math.PI * 0.95, -Math.PI * 0.05), v = rnd(160, 420); addPart({ t: 'conf', x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, max: rnd(1.1, 1.9), r: rnd(4, 7), col: pick(cols), g: 520, rot: rnd(0, TAU), vr: rnd(-9, 9) }); }
+  var cols = [RED, TEAL, GOLDC, '#fff', '#FF8FA3', '#7FD6D2'];
+  for (var i = 0; i < n; i++){ var a = rnd(0, TAU), sp = rnd(120, 520); addP({ t: 'conf', x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 180, g: 700, rot: rnd(0, TAU), vr: rnd(-10, 10), max: rnd(0.9, 1.7), sz: rnd(5, 10), col: pick(cols) }); }
 }
-function floatText(x, y, text, col){ addPart({ t: 'txt', x: x, y: y, vy: -70, max: 0.95, txt: text, col: col }); }
-function sparkle(x, y, kind, r, col, vy, max){ addPart({ t: kind, x: x, y: y, vx: rnd(-14, 14), vy: vy, max: max, r: r, col: col, rot: rnd(-0.5, 0.5), vr: rnd(-2, 2), wig: rnd(0, 6) }); }
-
-/* ---------- Заказ и интерфейс ---------- */
-function paintIcon(c, k, got){
-  var g = c.getContext('2d'); g.clearRect(0, 0, 80, 80); g.drawImage(got ? SPR[k] : SIL[k], 4, 4, 72, 72); c.classList.toggle('got', got);
-}
-function buildOrderUI(){
-  var box = $('ordI'); box.innerHTML = '';
-  order.ing.forEach(function(k){ var c = document.createElement('canvas'); c.width = c.height = 80; box.appendChild(c); paintIcon(c, k, false); });
-  $('ordName').textContent = order.name;
-}
-function refreshOrderUI(){
-  var cs = $('ordI').children;
-  for (var i = 0; i < cs.length; i++) paintIcon(cs[i], order.ing[i], order.got.indexOf(order.ing[i]) >= 0);
-}
-function newOrder(){
-  var i = Math.floor(Math.random() * ORDERS.length); if (order && i === order.i) i = (i + 1) % ORDERS.length;
-  order = makeOrder(i); buildOrderUI();
-}
-function setScoreUI(){
-  var m = combo >= 10 ? 3 : combo >= 5 ? 2 : 1;
-  $('score').style.visibility = (state === 'idle' && team === 'WEDRINK') ? 'hidden' : 'visible';
-  setText($('scoreN'), state === 'idle' ? team : String(Math.round(dispScore)));
-  setText($('scoreM'), state !== 'idle' && m > 1 ? '×' + m : '');
-}
-var dispScore = 0;
-function setHint(txt, secs){ var h = $('hint'); h.textContent = txt; h.style.opacity = txt ? 1 : 0; hintT = secs || 0; }
-function big(txt){ var b = $('big'); b.textContent = txt; b.classList.remove('go'); void b.offsetWidth; b.classList.add('go'); }
-function updateDots(){
-  var ds = document.querySelectorAll('.dot');
-  for (var i = 0; i < ds.length; i++) ds[i].classList.toggle('on', ds[i].getAttribute('data-o') === outfit);
-}
-function setOutfit(o, silent){
-  if (o === outfit) return;
-  outfit = o; swapT = 0; store.outfit = o; saveStore(); updateDots();
-  parts.length = 0; happyT = 0; mustT = 0;
-  if (!silent && state === 'idle') setHint(HINTS[o], 4.5);
-}
-function nextOutfit(dir){ setOutfit(OUTFITS[(OUTFITS.indexOf(outfit) + dir + 3) % 3]); }
-function currentDrink(){ return order ? ORDERS[order.i] : ORDERS[idleI]; }
-function cycleDrink(){
-  idleI = (idleI + 1) % ORDERS.length; idleSips = 0;
-  if (state === 'idle') setHint(ORDERS[idleI].name, 2.2);
-}
-
-/* ---------- Раунд ---------- */
-function startRound(){
-  items.length = 0; score = 0; dispScore = 0; combo = 0; tRound = 0; cdT = 0; drinks = 0; lastScore = null; orderPause = 0; fillT = 0;
-  state = 'countdown'; $('sheet').classList.remove('on'); $('hud').classList.add('on');
-  $('ctl').style.display = 'none'; $('dots').style.display = 'none'; setHint('', 0); $('combo').classList.remove('on');
-  order = null; newOrder(); $('order').classList.add('on'); $('ordT').textContent = ROUND;
-  $('tbar').style.transform = 'scaleX(1)'; setScoreUI();
-}
-function endRound(){
-  state = 'result'; lastScore = score; lastDrinks = drinks; items.length = 0;
-  var prev = bestOf(), isNew = score > prev && score > 0, me = addResult(score);
-  $('rscore').textContent = score;
-  $('rDrinks').textContent = 'Напитков собрано: ' + drinks;
-  $('rTitle').textContent = isNew && score > 0 ? 'Новый рекорд!' : 'Раунд окончен';
-  $('rMeta').textContent = 'Твой рекорд: ' + bestOf();
-  var ul = $('rList'); ul.innerHTML = '';
-  store.top.forEach(function(e, i){ var li = document.createElement('li'); if (e === me || e.n === me.n) li.className = 'me'; var a = document.createElement('span'); a.textContent = (i + 1) + '. ' + e.s; var b = document.createElement('i'); b.textContent = e.d; li.appendChild(a); li.appendChild(b); ul.appendChild(li); });
-  $('tbar').style.transform = 'scaleX(0)'; $('order').classList.remove('on');
-  order = null;
-  $('hud').classList.remove('on'); $('sheet').classList.add('on');
-  vibrate([20, 40, 20]);
-}
-function toIdle(){
-  state = 'idle'; order = null; $('sheet').classList.remove('on'); $('hud').classList.add('on'); $('order').classList.remove('on');
-  $('ctl').style.display = 'flex'; $('dots').style.display = 'flex';
-  $('tbar').style.transform = 'scaleX(0)'; $('combo').classList.remove('on'); setScoreUI(); updateDots();
-  setHint(HINTS[outfit], 4.5);
-}
-function pickKey(){
-  var need = order ? order.ing.filter(function(k){ return order.got.indexOf(k) < 0; }) : [];
-  if (need.length && Math.random() < 0.5) return pick(need);
-  var rest = ING_KEYS.filter(function(k){ return need.indexOf(k) < 0; });
-  return pick(rest);
-}
-function spawnItem(){
-  var p = tRound / ROUND, r = clamp(W * 0.052, 17, 24);
-  items.push({ k: pickKey(), x: rnd(W * 0.12, W * 0.88), y: -r * 1.6, vx: rnd(-12, 12), vy: H * (0.25 + 0.27 * p) * rnd(0.92, 1.08), r: r, rot: rnd(-0.5, 0.5), vr: rnd(-2, 2), eat: false, eT: 0 });
-}
-var doneCup = null;
-function completeOrder(){
-  doneCup = { t: 0, name: order.name, col: order.col };
-  score += 30; drinks++; fillT = 1.7; glowBoost = 1.4; orderPause = 1.0; combo = combo;
-  confetti(W / 2, H * 0.34, 46); confetti(P.mouth.x, P.mouth.y, 22);
-  floatText(W / 2, H * 0.68, 'Напиток готов! +30', '#FFD36B'); mascotJump(true); vibrate([25, 30, 25]); popT = 1;
-}
-function onCatchItem(it){
-  var need = order && order.ing.indexOf(it.k) >= 0 && order.got.indexOf(it.k) < 0;
-  if (need){
-    order.got.push(it.k); combo++; var mult = combo >= 10 ? 3 : combo >= 5 ? 2 : 1, pts = 10 * mult; score += pts; popT = 1;
-    floatText(P.mouth.x, P.mouth.y - P.s * 0.3, '+' + pts, '#fff'); burst(it.x, it.y, '#FFD36B', 10); vibrate(12); mascotJump(false);
-    if (combo === 5 || combo === 10) floatText(W / 2, H * 0.3, 'Серия ×' + mult + '!', '#FFD36B');
-    refreshOrderUI();
-    if (order.got.length === order.ing.length) completeOrder();
-  } else {
-    score = Math.max(0, score - 10); combo = 0; shakeT = REDUCED ? 0 : 0.3; flashT = 0.3; popT = 1;
-    floatText(P.mouth.x, P.mouth.y - P.s * 0.3, '−10', '#FF8FA3'); burst(it.x, it.y, '#9aa5a5', 8); vibrate([30, 40, 30]); mascotSad();
-  }
-  var m2 = combo >= 10 ? 3 : combo >= 5 ? 2 : 1;
-  var el = $('combo'); if (combo >= 3){ el.textContent = 'Серия ' + combo + (m2 > 1 ? ' · ×' + m2 : ''); el.classList.add('on'); } else el.classList.remove('on');
-}
-
-function stepGame(h){
-  if (state === 'countdown'){
-    var before = cdT === 0 ? -1 : Math.floor(cdT / 0.8); cdT += h; var n = Math.floor(cdT / 0.8);
-    if (n !== before && n < 3) big(3 - n);
-    if (cdT >= 2.4){ state = 'round'; tRound = 0; spawnT = 0.15; big('Лови!'); }
-  } else if (state === 'round'){
-    tRound += h; if (tRound >= ROUND){ endRound(); return; }
-    var p = tRound / ROUND; spawnT -= h;
-    if (spawnT <= 0){ spawnItem(); spawnT = lerp(1.0, 0.46, p) * rnd(0.85, 1.2); }
-    if (orderPause > 0){ orderPause -= h; if (orderPause <= 0) newOrder(); }
-    setText($('ordT'), String(Math.max(0, Math.ceil(ROUND - tRound))));
-    $('tbar').style.transform = 'scaleX(' + (1 - tRound / ROUND) + ')';
-  }
-  var catchR = Math.max(P.s * 0.3, 30);
-  for (var i = items.length - 1; i >= 0; i--){
-    var b = items[i];
-    if (b.eat){
-      b.eT += h; var k = Math.min(1, b.eT / 0.14); var kk = 1 - Math.pow(0.0001, h * 3);
-      b.x = lerp(b.x, P.mouth.x, kk); b.y = lerp(b.y, P.mouth.y, kk); b.r0 = b.r0 || b.r; b.r = b.r0 * (1 - k);
-      if (k >= 1) items.splice(i, 1);
-      continue;
-    }
-    b.y += b.vy * h; b.x += b.vx * h; b.rot += b.vr * h;
-    if (state === 'round' && orderPause <= 0.6 && mouthOpen && P.alpha > 0.5 && Math.hypot(b.x - P.mouth.x, b.y - P.mouth.y) < catchR + b.r * 0.4){
-      b.eat = true; b.eT = 0; onCatchItem(b); continue;
-    }
-    if (b.y > H + 50) items.splice(i, 1);
-  }
-}
-
-/* ---------- Стакан: шарики тапиоки ---------- */
-function cupHW(y){ return 0.74 - 0.11 * (y + 0.8) / 2.2; }
-function cupTrap(g, inset, y0, y1){
-  g.moveTo(-(cupHW(y0) - inset), y0); g.lineTo(cupHW(y0) - inset, y0); g.lineTo(cupHW(y1) - inset, y1); g.lineTo(-(cupHW(y1) - inset), y1); g.closePath();
-}
-function initCup(){
-  cup.length = 0; cupRespawn.length = 0;
-  for (var i = 0; i < 11; i++) cup.push({ x: -0.45 + (i % 6) * 0.17 + (i > 5 ? 0.08 : 0), y: 0.93 - Math.floor(i / 6) * 0.12, vx: 0, vy: 0, r: 0.06, st: 0, u: 0, sx: 0, sy: 0 });
-}
-initCup();
-function dz(v){ var a = Math.abs(v) - 450; return a > 0 ? (v < 0 ? -a : a) : 0; }
-function setText(el, t){ if (el.textContent !== t) el.textContent = t; }
-function stepCup(h){
-  if (outfit !== 'A') return;
-  var th = P.rot, sn = Math.sin(th), cs = Math.cos(th);
-  var dax = dz(hk.ax), day = dz(hk.ay);
-  var fx = clamp(-(dax * cs + day * sn) / P.s * 0.35, -26, 26), fy = clamp(-(-dax * sn + day * cs) / P.s * 0.35, -26, 26);
-  var G = 9, gx = G * sn + fx, gy = G * cs + fy;
-  var sub = 2, hh = h / sub;
-  for (var s = 0; s < sub; s++){
-    var i, b, j, c2;
-    for (i = 0; i < cup.length; i++){
-      b = cup[i]; if (b.st) continue;
-      if (b.sc !== undefined && b.sc < 1) b.sc = Math.min(1, b.sc + hh / 0.3);
-      b.vx += gx * hh; b.vy += gy * hh; var d = Math.exp(-0.9 * hh); b.vx *= d; b.vy *= d;
-      b.x += b.vx * hh; b.y += b.vy * hh;
-      var lim = cupHW(b.y) - 0.09 - b.r;
-      if (b.x > lim){ b.x = lim; if (b.vx > 0) b.vx *= -0.3; b.vy *= 0.97; }
-      if (b.x < -lim){ b.x = -lim; if (b.vx < 0) b.vx *= -0.3; b.vy *= 0.97; }
-      if (b.y > CUP.floor - b.r){ b.y = CUP.floor - b.r; if (b.vy > 0) b.vy *= -0.28; b.vx *= 0.97; }
-      if (b.y < -1.15 + b.r){ b.y = -1.15 + b.r; if (b.vy < 0) b.vy *= -0.28; }
-    }
-    for (i = 0; i < cup.length; i++){
-      b = cup[i]; if (b.st) continue;
-      for (j = i + 1; j < cup.length; j++){
-        c2 = cup[j]; if (c2.st) continue;
-        var dx = c2.x - b.x, dy = c2.y - b.y, dd = dx * dx + dy * dy, mr = b.r + c2.r;
-        if (dd < mr * mr && dd > 1e-8){
-          var dist = Math.sqrt(dd), nx = dx / dist, ny = dy / dist, pen = (mr - dist) * 0.5;
-          b.x -= nx * pen; b.y -= ny * pen; c2.x += nx * pen; c2.y += ny * pen;
-          var rv = (c2.vx - b.vx) * nx + (c2.vy - b.vy) * ny;
-          if (rv < 0){ var imp = -rv * 0.6; b.vx -= nx * imp; b.vy -= ny * imp; c2.vx += nx * imp; c2.vy += ny * imp; }
-        }
-      }
-    }
-  }
-  // всасывание
-  for (var i2 = cup.length - 1; i2 >= 0; i2--){
-    var q = cup[i2]; if (!q.st) continue;
-    q.u += h / 0.3; var e = Math.min(1, q.u), ee = e * e * (3 - 2 * e);
-    q.x = lerp(q.sx, 0, ee); q.y = lerp(q.sy, 0.5, ee) - Math.sin(Math.PI * ee) * 0.16;
-    if (q.u >= 1){
-      var m = P.mouth; addPart({ t: 'pop', x: m.x, y: m.y, max: 0.26, r: P.s * 0.12 }); burst(m.x, m.y, '#FFE37A', 6);
-      cup.splice(i2, 1); cupRespawn.push(0.55); idleSips++; vibrate(8);
-      if (idleSips >= 7) cycleDrink();
-    }
-  }
-  for (var r = cupRespawn.length - 1; r >= 0; r--){
-    cupRespawn[r] -= h;
-    if (cupRespawn[r] <= 0){ cupRespawn.splice(r, 1); cup.push({ x: (Math.random() < 0.5 ? -1 : 1) * rnd(0.3, 0.46), y: 0.92, vx: 0, vy: 0, r: 0.06, sc: 0, st: 0, u: 0, sx: 0, sy: 0 }); }
-  }
-  // втягиваем по одному, пока рот открыт
-  if (state === 'idle' && mouthOpen && P.alpha > 0.5){
-    sipT -= h;
-    if (sipT <= 0){
-      var best = null, bd = 9;
-      for (var z = 0; z < cup.length; z++){ var cb = cup[z]; if (cb.st) continue; var dm = Math.hypot(cb.x, cb.y - 0.5); if (dm < bd){ bd = dm; best = cb; } }
-      if (best && cup.length > 3){ best.st = 1; best.u = 0; best.sx = best.x; best.sy = best.y; sipT = 0.26; }
-    }
-  } else sipT = 0;
-}
-
-/* ---------- Прочие шаги ---------- */
+function floatText(x, y, text, col){ addP({ t: 'txt', x: x, y: y, vx: 0, vy: -90, g: 0, max: 1, txt: text, col: col || '#fff' }); }
+function sparkle(x, y, r, col){ addP({ t: 'spark', x: x, y: y, vx: rnd(-20, 20), vy: rnd(-30, 10), g: 0, max: rnd(0.5, 0.9), sz: r, col: col || '#fff', rot: rnd(0, 1), vr: rnd(-3, 3) }); }
+function drop(x, y, vx, vy, col, sz){ addP({ t: 'drop', x: x, y: y, vx: vx, vy: vy, g: 1300, max: 1.3, sz: sz || 5, col: col }); }
 function stepParts(h){
   for (var i = parts.length - 1; i >= 0; i--){
-    var q = parts[i]; q.life += h; q.vy += q.g * h; q.x += q.vx * h; q.y += q.vy * h; q.rot += q.vr * h;
-    if (q.wig !== undefined) q.x += Math.sin(q.life * 6 + q.wig) * 22 * h;
-    if (q.life >= q.max) parts.splice(i, 1);
+    var p = parts[i]; p.age += h;
+    if (p.age >= p.max){ parts.splice(i, 1); continue; }
+    p.vy += (p.g || 0) * h; p.x += p.vx * h; p.y += p.vy * h; if (p.vr) p.rot += p.vr * h;
+    if (p.t === 'steam'){ p.x += Math.sin(p.age * 3 + p.ph) * 14 * h; }
+    if (p.t === 'flake'){ p.vx *= (1 - 0.6 * h); }
   }
 }
-function stepSnow(h){
-  if (outfit !== 'B' || REDUCED){ return; }
-  while (snowB.length < 38) snowB.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.3, 3), vy: rnd(22, 50), ph: rnd(0, 6.28) });
-  while (snowF.length < 12) snowF.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(5, 10), vy: rnd(60, 110), ph: rnd(0, 6.28), rot: rnd(0, 6) });
-  var t = clock;
-  for (var i = 0; i < snowB.length; i++){ var f = snowB[i]; f.y += f.vy * h; f.x += Math.sin(t * 0.8 + f.ph) * 12 * h; if (f.y > H + 5){ f.y = -5; f.x = rnd(0, W); } }
-  for (var j = 0; j < snowF.length; j++){ var g = snowF[j]; g.y += g.vy * h; g.x += Math.sin(t * 0.9 + g.ph) * 22 * h; g.rot += h * 0.8; if (g.y > H + 12){ g.y = -12; g.x = rnd(0, W); } }
-}
-function stepDrips(h){
-  if (outfit !== 'C') return;
-  if (!drips.length) [-0.42, -0.14, 0.14, 0.4].forEach(function(x, i){ drips.push({ x: x, L: 0.03 + i * 0.03, max: 0.15 + (i % 2) * 0.05, rate: 0.022 + i * 0.004 }); });
-  for (var i = 0; i < drips.length; i++){
-    var d = drips[i]; d.L += d.rate * h * (1 + (fillT > 0 ? 2.5 : 0));
-    if (d.L > d.max){ var w = f2w(d.x, -0.46 + d.L); addPart({ t: 'drop', x: w.x, y: w.y, vy: 20, g: 650, max: 1.3, r: P.s * 0.06 }); d.L = 0.02; }
-  }
-}
-function stepMasks(h){
-  if (doneCup){ doneCup.t += h; if (doneCup.t > 1.3) doneCup = null; }
-  if (happyT > 0){
-    happyT -= h;
-    if (Math.random() < 14 * h){ var w = f2w(rnd(-0.85, 0.85), rnd(-0.5, 0.7)); sparkle(w.x, w.y, Math.random() < 0.5 ? 'star' : 'heart', P.s * rnd(0.05, 0.09), Math.random() < 0.5 ? '#FFD36B' : '#FF8FA3', -rnd(25, 55), rnd(0.9, 1.4)); }
-  }
-  if (mustT > 0) mustT -= h;
-  if (outfit === 'B' && mouthOpen && state === 'idle' && P.alpha > 0.5){
-    stFlag -= h;
-    if (stFlag <= 0){
-      stFlag = 0.07; var m = P.mouth, k = P.s / 140;
-      addPart({ t: 'steam', x: m.x + rnd(-6, 6) * k, y: m.y, vx: rnd(-14, 14), vy: -rnd(150, 230) * k, max: 1.0, r: P.s * 0.05, gr: P.s * 0.14 });
-      if (Math.random() < 0.3) sparkle(m.x, m.y - P.s * 0.1, Math.random() < 0.5 ? 'heart' : 'star', P.s * rnd(0.07, 0.1), Math.random() < 0.5 ? '#FF6B85' : '#FFD36B', -rnd(70, 110) * k, 1.6);
-    }
-  } else stFlag = 0;
-  if (fillT > 0) fillT -= h;
-  if (glowBoost > 0) glowBoost -= h;
-  if (mas.jump > 0) mas.jump = Math.max(0, mas.jump - h * 1.9);
-  if (mas.sad > 0) mas.sad = Math.max(0, mas.sad - h * 1.1);
-  if (popT > 0) popT = Math.max(0, popT - h * 4);
-  if (shakeT > 0) shakeT -= h;
-  if (flashT > 0) flashT -= h;
-  if (swapT < 1) swapT = Math.min(1, swapT + h / 0.4);
-  // пружины: помпон, трубочка, поверхность напитка
-  var sn = Math.sin(P.rot), cs = Math.cos(P.rot);
-  var lat = clamp(-(dz(hk.ax) * cs + dz(hk.ay) * sn) / P.s * 0.002, -0.9, 0.9);
-  var tp = clamp(-P.rot * 0.9 + lat * 4 + clamp(-hk.vx / P.s * 0.05, -0.5, 0.5), -1.1, 1.1);
-  if (!REDUCED){ pomV += ((tp - pomA) * 110 - pomV * 7) * h; pomA += pomV * h; } else pomA = 0;
-  var ts = -0.2 + clamp(-hk.vx / P.s * 0.05, -0.4, 0.4) + Math.sin(clock * 2.2) * (REDUCED ? 0 : 0.05);
-  strawV += ((ts - strawA) * 90 - strawV * 6) * h; strawA += strawV * h;
-  var tl = clamp(-(dz(hk.ax) * cs + dz(hk.ay) * sn) / P.s * 0.0035, -0.45, 0.45);
-  sloshV += ((tl - slosh) * 70 - sloshV * 5) * h; slosh += sloshV * h;
-  var tgt = hexToRgb(currentDrink().col); drinkRGB = mixA(drinkRGB, tgt, 1 - Math.pow(0.02, h));
-}
-function step(h){
-  stepGame(h); stepCup(h); stepParts(h); stepSnow(h); stepDrips(h); stepMasks(h);
-}
-
-/* ---------- Рисование частиц ---------- */
 function drawParts(){
   var g = ctx;
-  for (var k = 0; k < parts.length; k++){
-    var q = parts[k], f = 1 - q.life / q.max, a = clamp(f * 1.5, 0, 1);
-    g.globalAlpha = a;
-    if (q.t === 'txt'){
-      var sz = Math.round(clamp(W * 0.065, 19, 28)); g.font = '900 ' + sz + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.lineJoin = 'round'; g.lineWidth = 6; g.strokeStyle = INK; g.strokeText(q.txt, q.x, q.y); g.fillStyle = q.col; g.fillText(q.txt, q.x, q.y);
-    } else if (q.t === 'conf'){
-      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.fillStyle = q.col; g.fillRect(-q.r, -q.r * 0.5, q.r * 2, q.r); g.restore();
-    } else if (q.t === 'star' || q.t === 'heart'){
-      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.lineJoin = 'round'; g.beginPath();
-      if (q.t === 'star') star4(g, q.r * (0.6 + 0.4 * f)); else heartP(g, q.r * (0.6 + 0.4 * f));
-      g.fillStyle = q.col; g.fill(); g.lineWidth = Math.max(1.6, q.r * 0.28); g.strokeStyle = INK; g.stroke(); g.restore();
-    } else if (q.t === 'steam'){
-      g.fillStyle = 'rgba(255,255,255,' + (0.42 * a) + ')'; g.beginPath(); g.arc(q.x, q.y, q.r + q.gr * q.life, 0, TAU); g.fill();
-    } else if (q.t === 'drop'){
-      g.fillStyle = FOAM; g.strokeStyle = INK; g.lineWidth = Math.max(2, q.r * 0.5); g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.stroke(); g.fill();
-    } else if (q.t === 'pop'){
-      var e = 1 - f, rr0 = q.r * (0.5 + e * 0.9);
-      g.save(); g.translate(q.x, q.y); g.rotate(e * 1.2); g.beginPath(); for (var si = 0; si < 16; si++){ var sa = si * Math.PI / 8, sr = rr0 * (si % 2 ? 0.7 : 1.25); if (si) g.lineTo(Math.cos(sa) * sr, Math.sin(sa) * sr); else g.moveTo(sr, 0); } g.closePath(); g.fillStyle = '#FFE37A'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = INK; g.lineJoin = 'round'; g.stroke();
-      g.beginPath(); g.arc(0, 0, rr0 * 0.45, 0, TAU); g.fillStyle = '#fff'; g.fill(); g.restore();
-    } else {
-      g.fillStyle = q.col; g.beginPath(); g.arc(q.x, q.y, q.r * f + 0.5, 0, TAU); g.fill();
-    }
+  for (var i = 0; i < parts.length; i++){
+    var p = parts[i], u = p.age / p.max, al = u > 0.7 ? 1 - (u - 0.7) / 0.3 : 1;
+    g.globalAlpha = clamp(al, 0, 1);
+    if (p.t === 'spr'){ var pp = u < 0.1 ? easeOutBack(u / 0.1) : 1; dimg(g, p.k, p.x, p.y, p.sz * pp, undefined, p.rot); }
+    else if (p.t === 'conf'){ g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.fillStyle = p.col; g.fillRect(-p.sz / 2, -p.sz / 4, p.sz, p.sz / 2); g.restore(); }
+    else if (p.t === 'drop'){ g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.sz, 0, TAU); g.fill(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(31,42,42,.55)'; g.stroke(); }
+    else if (p.t === 'steam'){ var r = p.sz * (0.5 + u * 1.2); var gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, r); gr.addColorStop(0, 'rgba(255,255,255,' + (0.55 * g.globalAlpha) + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.globalAlpha = 1; g.fillStyle = gr; g.beginPath(); g.arc(p.x, p.y, r, 0, TAU); g.fill(); }
+    else if (p.t === 'flake'){ g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.lineCap = 'round'; flake(g, 0, 0, p.sz, 4.4, INK); flake(g, 0, 0, p.sz, 2.2, '#fff'); g.restore(); }
+    else if (p.t === 'spark'){ g.save(); g.translate(p.x, p.y); g.rotate(p.rot * 3); var s = p.sz * (1 - u * 0.5); g.fillStyle = p.col; g.beginPath(); g.moveTo(0, -s); g.quadraticCurveTo(s * 0.18, -s * 0.18, s, 0); g.quadraticCurveTo(s * 0.18, s * 0.18, 0, s); g.quadraticCurveTo(-s * 0.18, s * 0.18, -s, 0); g.quadraticCurveTo(-s * 0.18, -s * 0.18, 0, -s); g.fill(); g.restore(); }
+    else if (p.t === 'txt'){ var pz = u < 0.15 ? easeOutBack(u / 0.15) : 1; g.save(); g.translate(p.x, p.y); g.scale(pz, pz); g.font = '900 26px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 6; g.lineJoin = 'round'; g.strokeStyle = INK; g.strokeText(p.txt, 0, 0); g.fillStyle = p.col; g.fillText(p.txt, 0, 0); g.restore(); }
   }
   g.globalAlpha = 1;
 }
 
-/* ---------- Румянец-спиральки как у маскота ---------- */
-function drawBlush(c, flip){
-  var R = P.s * 0.1, g = ctx;
-  g.save(); g.translate(c.x, c.y); g.rotate(P.rot);
-  g.fillStyle = 'rgba(255,140,158,.42)'; g.beginPath(); g.arc(0, 0, R * 1.35, 0, TAU); g.fill();
-  g.strokeStyle = '#E9475C'; g.lineWidth = Math.max(2, P.s * 0.024); g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
-  for (var k = 0; k <= 46; k++){ var a = k / 46 * 3.6 * Math.PI * flip, r2 = R * 1.15 * k / 46; var x = Math.cos(a) * r2, y = Math.sin(a) * r2; if (k) g.lineTo(x, y); else g.moveTo(x, y); }
-  g.stroke(); g.restore();
+/* ---------- Интерфейс ---------- */
+function setHint(txt, secs){ var h = $('hint'); h.textContent = txt; h.style.opacity = txt ? 1 : 0; hintT = secs || 0; }
+function big(txt){ var b = $('big'); b.textContent = txt; b.classList.remove('go'); void b.offsetWidth; b.classList.add('go'); }
+function showIntro(key){
+  var a = INTRO[key]; $('introT').textContent = a[0]; $('introS').textContent = a[1];
+  var el = $('intro'); el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); introT = 2.1;
 }
+function updateDots(){
+  Array.prototype.forEach.call(document.querySelectorAll('.dot'), function(d){ var on = d.getAttribute('data-o') === outfit; d.classList.toggle('on', on); d.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+}
+function setText(el, t){ if (el.textContent !== t) el.textContent = t; }
+function setScoreUI(){ setText($('scoreN'), String(Math.round(dispScore))); }
 
-/* ---------- Образ А: «Я — бабл-ти» ---------- */
-function strawSeg(g, pts, w){
-  g.lineCap = 'round'; g.lineJoin = 'round';
-  g.strokeStyle = INK; g.lineWidth = w + LW * 2; g.beginPath(); pts.forEach(function(p, i){ if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }); g.stroke();
-  g.strokeStyle = '#fff'; g.lineWidth = w; g.stroke();
+/* ---------- Барабан напитков (образ 1) ---------- */
+var DRINKS = [
+  { k: 'd_tapioca', n: 'Молочный чай с тапиокой', c: 'молочная основа, чёрный чай, жемчужная тапиока', ing: ['i_pearl'] },
+  { k: 'd_double_milk', n: 'Двойной молочный чай', c: 'молочная основа, чёрный чай, тапиока, красная фасоль', ing: ['i_pearl', 'i_bean'] },
+  { k: 'd_double_passion', n: 'Двойная маракуйя', c: 'жасминовый чай, джем маракуйи, тапиока, кокосовые дольки', ing: ['i_pearl', 'i_coconut', 'i_lemon'] },
+  { k: 'd_blueberry_tea', n: 'Черничный чай с ягодами', c: 'жасминовый чай, черничный джем, кокосовые дольки', ing: ['i_coconut', 'i_lemon'] },
+  { k: 'd_raspberry_orange', n: 'Малина-апельсиновый чай', c: 'малиновый сок, апельсиновые и кокосовые дольки', ing: ['i_lemon', 'i_peach', 'i_coconut'] },
+  { k: 'd_lemonade', n: 'Освежающий лимонад', c: 'фруктовая вода, ломтики лимона', ing: ['i_lemon'] },
+  { k: 'd_mango_snow', n: 'Манговый снежный десерт', c: 'манго, джем маракуйи, тапиока, сливочное мороженое', ing: ['i_pearl', 'i_peach', 'i_coconut'] },
+  { k: 'd_oreo_dessert', n: 'Шоколадный десерт Oreo', c: 'шоколадное мороженое, Oreo, тапиока', ing: ['i_oreo', 'i_pearl'] },
+  { k: 'd_shake_strawberry', n: 'Клубничный милкшейк', c: 'сливочное мороженое, жасминовый чай, клубничный джем', ing: ['i_coconut', 'i_peach'] },
+  { k: 'd_fruit_bucket', n: 'Супер фруктовое ведро, 1 л', c: 'маракуйя, персик или апельсин с фруктами', ing: ['i_lemon', 'i_peach', 'i_coconut'] },
+  { k: 'd_foam_peach', n: 'Персиковый чай с сырной пенкой', c: 'жасминовый чай, персиковое желе, шапка сырной пенки', ing: ['i_peach', 'i_coconut'] },
+  { k: 'd_foam_strawberry', n: 'Клубничный чай с сырной пенкой', c: 'жасминовый чай, персиковое желе, клубничный вкус, сырная пенка', ing: ['i_peach', 'i_coconut'] }
+];
+var ND = DRINKS.length;
+var rl = { st: 'spin', r: 0, v: 0, from: 0, dist: 0, t: 0, dur: 2.9, idx: -1, tgt: 0, last: -1, showT: 0, x: 0, y: 0, R: 60, init: false };
+function rlReset(){ rl.spinT = 0; rl.hinted = false; rl.py = 0; rl.st = 'spin'; rl.v = 0; rl.showT = 0; rl.init = false; rl.last = -1; }
+function rlSpin(){ rl.spinT = 0; rl.hinted = false; rl.st = 'spin'; rl.showT = 0; SFX.whoosh(); mascotMood('m_hmm', 5); setHint('', 0); }
+function rlStop(){
+  var k; do { k = Math.floor(Math.random() * ND); } while (k === rl.idx && ND > 1);
+  var cur = ((rl.r % ND) + ND) % ND, d = ((k - cur) % ND + ND) % ND + ND * 2;
+  rl.st = 'slow'; rl.from = rl.r; rl.dist = d; rl.t = 0; rl.tgt = k; SFX.boost();
 }
-function drawStraw(g, len){
-  g.save(); g.translate(0.16, -1.2); g.rotate(strawA);
-  var l1 = len * 0.7, l2 = len * 0.3, bend = 0.7;
-  var p1 = [0, -l1], p2 = [Math.sin(bend) * l2, -l1 - Math.cos(bend) * l2], w = 0.13;
-  strawSeg(g, [[0, 0], p1, p2], w);
-  g.fillStyle = RED;
-  var drawStripe = function(x, y, ang){
-    g.save(); g.translate(x, y); g.rotate(ang); g.beginPath(); g.moveTo(-w / 2, 0.02); g.lineTo(w / 2, -0.03); g.lineTo(w / 2, -0.095); g.lineTo(-w / 2, -0.045); g.closePath(); g.fill(); g.restore();
-  };
-  for (var d = 0.05; d < l1 - 0.08; d += 0.15) drawStripe(0, -d, 0);
-  for (var d2 = 0.14; d2 < l2 - 0.06; d2 += 0.15) drawStripe(p1[0] + Math.sin(bend) * d2, p1[1] - Math.cos(bend) * d2, bend);
-  g.restore();
+function stepRoulette(h){
+  if (outfit !== 'A' || state !== 'idle') return;
+  if (rl.st === 'spin'){ rl.v = lerp(rl.v, 13, 1 - Math.exp(-h * 5)); rl.r += rl.v * h; rl.spinT = (rl.spinT || 0) + h; if (rl.spinT > 5 && !rl.hinted){ rl.hinted = true; setHint('Подними брови или открой рот: стоп', 3); } }
+  else if (rl.st === 'slow'){
+    rl.t += h; var u = clamp(rl.t / rl.dur, 0, 1), e = 1 - Math.pow(1 - u, 3.2);
+    rl.r = rl.from + rl.dist * e; rl.v = rl.dist * 3.2 * Math.pow(1 - u, 2.2) / rl.dur;
+    var fl = Math.floor(rl.r + 0.5); if (fl !== rl.last){ rl.last = fl; SFX.tick(520 + 420 * (1 - u)); }
+    if (u >= 1){
+      rl.st = 'show'; rl.showT = 0; rl.idx = rl.tgt; rl.v = 0;
+      var d = DRINKS[rl.idx]; SFX.win(); mascotJump('m_ura'); vibrate(30);
+      burstSpr(rl.x, rl.y, d.ing, 16, 620, rl.R * 0.42); confetti(rl.x, rl.y, 36);
+      
+    }
+  } else if (rl.st === 'show'){ rl.showT += h; if (rl.showT < 1.4 && Math.random() < h * 14) sparkle(rl.x + rnd(-rl.R, rl.R), rl.y + rnd(-rl.R, rl.R * 0.6), rnd(7, 13), pick(['#fff', GOLDC])); }
+}
+function onTrigger(){
+  if (state !== 'idle') return;
+  if (outfit === 'A'){ if (rl.st === 'spin') rlStop(); else if (rl.st === 'show') rlSpin(); }
 }
 function drawA(t){
-  var g = ctx, dc = currentDrink();
-  faceBegin();
-  var surge = fillT > 0 ? (fillT > 1.2 ? easeOutBack(clamp((1.7 - fillT) / 0.5, 0, 1)) : fillT > 0.8 ? 1 : fillT / 0.8) : 0;
-  var base = 0.74 - 0.05 * (order ? order.got.length : 0);
-  var lvl = lerp(base, -0.28, clamp(surge, 0, 1.05));
-  // жидкость и шарики внутри стакана
-  g.save(); g.beginPath(); cupTrap(g, 0.09, CUP.top, CUP.floor); g.clip();
-  g.save(); g.translate(0, lvl); g.rotate(-(P.rot + slosh));
-  var amp = 0.012 + clamp(Math.hypot(hk.vx, hk.vy) / (P.s * 9), 0, 0.035), wy = function(x){ return Math.sin(x * 9 + t * 3) * amp + Math.sin(x * 5 - t * 2.1) * amp * 0.6; };
-  if (dc.foam){
-    g.beginPath(); g.moveTo(-1.6, -0.07); for (var xf = -1.6; xf <= 1.6; xf += 0.1) g.lineTo(xf, wy(xf) - 0.07); for (var xb = 1.6; xb >= -1.6; xb -= 0.1) g.lineTo(xb, wy(xb) + 0.01); g.closePath();
-    g.fillStyle = FOAM; g.fill(); g.lineWidth = LW * 0.5; g.strokeStyle = INK; g.stroke();
+  var g = ctx, s = P.s, e = clamp(entT / 0.9, 0, 1), ent = easeOutBack(e);
+  var R = clamp(Math.min(0.8 * s, (P.ey - 0.95 * s - SAFET - 64) / 2 - 4), 40, 96);
+  var up = 0.95 * s + R + 8, tx = P.ex + Math.sin(P.rot) * up, ty = Math.max(P.ey - Math.cos(P.rot) * up, SAFET + 58 + R);
+  if (!rl.init){ rl.x = tx; rl.y = ty; rl.init = true; }
+  var k = REDUCED ? 1 : 0.28; rl.x = lerp(rl.x, tx, k); rl.y = lerp(rl.y, ty, k); rl.R = R;
+  var cx = rl.x + Math.sin(t * 1.7) * 2, cy = rl.y + Math.sin(t * 2.3) * 3 - (1 - ent) * H * 0.55;
+  var showP = rl.st === 'show' ? easeOutBack(clamp(rl.showT / 0.5, 0, 1)) : 0;
+  var sc = clamp(ent, 0, 1.15) * (1 + 0.06 * showP);
+  if (sc < 0.02) return;
+  ext = Math.min(ext, cy - R * (1.3 + 0.5 * showP));
+  g.save(); g.translate(cx, cy); g.rotate(P.rot * 0.5 + (1 - e) * -3 + Math.sin(t * 1.1) * 0.03); g.scale(sc, sc);
+  // тень
+  g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(0, R + 14, R * 0.8, 9, 0, 0, TAU); g.fill();
+  // кольцо-наклейка
+  g.fillStyle = INK; g.beginPath(); g.arc(0, 0, R + 11, 0, TAU); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(0, 0, R + 7, 0, TAU); g.fill();
+  g.save(); g.beginPath(); g.arc(0, 0, R, 0, TAU); g.clip();
+  g.fillStyle = TEALD; g.fillRect(-R, -R, R * 2, R * 2);
+  var rays = 14, rot = t * (0.35 + Math.min(rl.v, 13) * 0.05);
+  for (var i = 0; i < rays; i++){ var a0 = rot + i * TAU / rays; g.fillStyle = i % 2 ? '#25A9A6' : '#1B8F8E'; if (rl.st === 'show' && i % 2) g.fillStyle = '#F7C948'; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R * 1.5, a0, a0 + TAU / rays); g.closePath(); g.fill(); }
+  var shine = g.createRadialGradient(0, -R * 0.3, R * 0.1, 0, 0, R); shine.addColorStop(0, 'rgba(255,255,255,.35)'); shine.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = shine; g.fillRect(-R, -R, R * 2, R * 2);
+  // барабан
+  var base = Math.floor(rl.r), fr = rl.r - base, fast = clamp(rl.v / 13, 0, 1);
+  for (var o = -2; o <= 3; o++){
+    var idx = ((base + o) % ND + ND) % ND, off = o - fr, ao = Math.abs(off);
+    if (rl.st === 'show' && ao > 0.5) continue;
+    var sx = off * R * (1.02 + 0.35 * fast), sz = (1 - 0.3 * Math.min(ao, 1.4)) * (1 - 0.05 * fast), hh = R * 1.55 * sz;
+    var im = IM[DRINKS[idx].k]; if (!im) continue;
+    var ww = hh / asp(DRINKS[idx].k) * (1 + 0.35 * fast);
+    if (rl.st === 'show') continue;
+    g.globalAlpha = clamp(1.25 - ao * 0.5, 0.25, 1);
+    if (fast > 0.3){ g.globalAlpha *= 0.55; g.drawImage(im, sx - ww / 2 - fast * 14, -hh * 0.48, ww, hh); g.globalAlpha = clamp(1.25 - ao * 0.5, 0.25, 1) * 0.9; }
+    g.drawImage(im, sx - ww / 2, -hh * 0.5, ww, hh);
   }
-  g.beginPath(); g.moveTo(-1.6, 3); for (var x = -1.6; x <= 1.6; x += 0.1) g.lineTo(x, wy(x)); g.lineTo(1.6, 3); g.closePath();
-  g.fillStyle = rgb(drinkRGB, 0.74 - 0.24 * clamp(surge, 0, 1)); g.fill();
-  g.beginPath(); for (var x2 = -1.6; x2 <= 1.6; x2 += 0.1){ if (x2 < -1.55) g.moveTo(x2, wy(x2)); else g.lineTo(x2, wy(x2)); }
-  g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 0.02; g.stroke();
+  g.globalAlpha = 1;
   g.restore();
-  for (var i = 0; i < cup.length; i++){
-    var b = cup[i]; if (b.st) continue;
-    var br = b.r * (b.sc === undefined ? 1 : easeOutBack(b.sc));
-    g.beginPath(); g.arc(b.x, b.y, br, 0, TAU); g.fillStyle = '#5B3A2F'; g.fill(); g.lineWidth = LW * 0.5; g.strokeStyle = INK; g.stroke();
-    g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(b.x - br * 0.35, b.y - br * 0.38, br * 0.22, 0, TAU); g.fill();
-  }
-  g.restore();
-  // стенки стакана
-  g.beginPath(); cupTrap(g, 0, CUP.top, CUP.floor); cupTrap(g, 0.09, CUP.top, CUP.floor); g.fillStyle = 'rgba(255,255,255,.34)'; g.fill('evenodd');
-  g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 0.014; g.beginPath();
-  g.moveTo(-(cupHW(CUP.top) - 0.09), CUP.top); g.lineTo(-(cupHW(CUP.floor) - 0.09), CUP.floor); g.moveTo(cupHW(CUP.top) - 0.09, CUP.top); g.lineTo(cupHW(CUP.floor) - 0.09, CUP.floor); g.stroke();
-  g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 0.034; g.beginPath(); g.moveTo(-0.665, -0.5); g.lineTo(-0.65, 0.3); g.stroke();
-  g.beginPath(); g.moveTo(-0.655, 0.45); g.lineTo(-0.652, 0.46); g.stroke();
-  g.lineWidth = 0.02; g.beginPath(); g.moveTo(0.665, -0.3); g.lineTo(0.66, 0.05); g.stroke();
-  // внешний контур
-  g.strokeStyle = INK; g.lineWidth = LW; g.beginPath(); g.moveTo(-cupHW(CUP.top), CUP.top); g.lineTo(-cupHW(CUP.bot), CUP.bot); g.moveTo(cupHW(CUP.top), CUP.top); g.lineTo(cupHW(CUP.bot), CUP.bot); g.stroke();
-  // манжета с надписью
-  g.beginPath(); cupTrap(g, 0, CUP.floor, CUP.bot); g.fillStyle = '#FFF8E8'; g.fill(); g.lineWidth = LW; g.strokeStyle = INK; g.stroke();
-  g.strokeStyle = RED; g.lineWidth = 0.02; g.beginPath(); g.moveTo(-cupHW(1.04) + 0.02, 1.045); g.lineTo(cupHW(1.04) - 0.02, 1.045); g.stroke();
-  g.save(); g.translate(0, team !== 'WEDRINK' ? 1.15 : 1.19); g.scale(0.01, 0.01); g.textAlign = 'center'; g.textBaseline = 'middle';
-  fitFont(g, 'WEDRINK', 120, 29); g.fillStyle = RED; g.fillText('WEDRINK', 0, 0); g.restore();
-  g.save(); g.translate(0, 1.292); g.scale(0.01, 0.01); g.textAlign = 'center'; g.textBaseline = 'middle'; if (team !== 'WEDRINK'){ fitFont(g, team, 80, 11); g.fillStyle = TEALD; g.fillText(team, 0, 0); } g.restore();
-  // купольная крышка и трубочка
-  var topLim = SAFET + ((state === 'round' || state === 'countdown') ? 136 : 70), hh = (P.ey - topLim) / P.s, len = clamp(hh - 1.3, 0.3, 0.95);
-  drawStraw(g, len);
-  g.beginPath(); g.moveTo(-0.7, -0.86); g.bezierCurveTo(-0.72, -1.4, 0.72, -1.4, 0.7, -0.86); g.closePath();
-  g.fillStyle = 'rgba(255,255,255,.22)'; g.fill(); g.lineWidth = LW; g.strokeStyle = INK; g.stroke();
-  g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 0.04; g.beginPath(); g.moveTo(-0.52, -1.02); g.quadraticCurveTo(-0.48, -1.18, -0.28, -1.23); g.stroke();
-  g.beginPath(); g.moveTo(-0.58, -0.96); g.lineTo(-0.575, -0.955); g.stroke();
-  rr(g, -0.79, -0.9, 1.58, 0.14, 0.06); g.fillStyle = '#fff'; g.fill(); g.lineWidth = LW; g.strokeStyle = INK; g.stroke();
-  // втягиваемые шарики поверх всего
-  for (var j = 0; j < cup.length; j++){
-    var q = cup[j]; if (!q.st) continue; var e = Math.min(1, q.u), rad = q.r * (1 - 0.45 * e);
-    g.beginPath(); g.arc(q.x, q.y, rad, 0, TAU); g.fillStyle = '#5B3A2F'; g.fill(); g.lineWidth = LW * 0.5; g.strokeStyle = INK; g.stroke();
+  g.lineWidth = 4; g.strokeStyle = INK; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.stroke();
+  // стрелка-указатель
+  g.fillStyle = RED; g.strokeStyle = INK; g.lineWidth = 3; g.beginPath(); g.moveTo(-9, -R - 14); g.lineTo(9, -R - 14); g.lineTo(0, -R + 2); g.closePath(); g.fill(); g.stroke();
+  if (rl.st === 'show'){
+    var d = DRINKS[rl.idx], hh2 = R * 2.1 * (0.55 + 0.45 * showP), ww2 = hh2 / asp(d.k);
+    g.save(); g.translate(0, -R * 0.12 - 8 * showP); g.rotate(Math.sin(t * 2) * 0.04); dimg(g, d.k, 0, 0, ww2, hh2); g.restore();
   }
   g.restore();
 }
-
-/* ---------- Образ Б: «Новогодний» ---------- */
-var GARLAND = [RED, '#FFD23F', TEAL, '#FF8FA3', '#ffffff', '#7FD6C2'];
-function drawGarland(t){
-  var g = ctx; faceBegin();
-  var N = 26, cy = 0.16, rx = 0.8, ry = 1.0;
-  g.strokeStyle = '#1D4D3B'; g.lineWidth = 0.022; g.beginPath(); g.ellipse(0, cy, rx, ry, 0, 0, TAU); g.stroke();
-  for (var i = 0; i < N; i++){
-    var a = i / N * TAU + 0.12, x = Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
-    var nx = Math.cos(a), ny = Math.sin(a) * 0.9, nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
-    var wv = 0.5 + 0.5 * Math.sin(clock * 5 - i * 0.6), br = clamp(wv + (glowBoost > 0 ? 0.6 : 0), 0, 1);
-    var col = GARLAND[i % GARLAND.length], bx = x + nx * 0.065, by = y + ny * 0.065;
-    var ga = g.globalAlpha; g.fillStyle = mix(col, '#ffffff', 0.45); g.globalAlpha = ga * (0.1 + br * 0.34); g.beginPath(); g.arc(bx, by, 0.11 + br * 0.04, 0, TAU); g.fill(); g.globalAlpha = ga;
-    g.fillStyle = INK; g.beginPath(); g.arc(x + nx * 0.015, y + ny * 0.015, 0.027, 0, TAU); g.fill();
-    g.beginPath(); g.arc(bx, by, 0.052, 0, TAU); g.fillStyle = mix(col, '#ffffff', br * 0.55); g.fill(); g.lineWidth = LW * 0.55; g.strokeStyle = INK; g.stroke();
-    g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(bx - 0.016, by - 0.018, 0.013, 0, TAU); g.fill();
+function drawPlaque(){
+  var g = ctx, s = P.s;
+  if (!(outfit === 'A' && state === 'idle' && rl.st === 'show' && P.alpha > 0.05)) return;
+  var pp = easeOutBack(clamp((rl.showT - 0.15) / 0.45, 0, 1)); if (pp <= 0.02) return;
+  var d2 = DRINKS[rl.idx], pw = Math.min(W - 24, 310), py = P.ey + 0.98 * s + 6, lim = H - SAFEB - 126, avail = lim - py;
+  var tiers = [[19, 2, true, 23], [17, 1, false, 21], [16, 1, false, 20]], L = null, i, nl, cl;
+  for (i = 0; i < tiers.length; i++){
+    var tr = tiers[i], nf = tr[0]; g.font = '900 ' + nf + 'px ' + FONT;
+    if (i === 2){ while (g.measureText(d2.n).width > pw - 28 && nf > 12){ nf--; g.font = '900 ' + nf + 'px ' + FONT; } nl = [d2.n]; } else nl = wrapText(g, d2.n, pw - 28).slice(0, 2);
+    g.font = '700 12.5px ' + FONT; cl = wrapText(g, d2.c, pw - 28).slice(0, tr[1]);
+    if (i === 2){ var c0 = d2.c; while (g.measureText(c0 + '…').width > pw - 28 && c0.length > 8) c0 = c0.slice(0, -1); cl = [c0.length < d2.c.length ? c0.replace(/[ ,]+$/, '') + '…' : c0]; }
+    L = { nf: nf, nl: nl, cl: cl, hint: tr[2], lh: tr[3], ph: 14 + nl.length * tr[3] + cl.length * 16 + (tr[2] ? 20 : 0) };
+    if (L.ph <= avail) break;
   }
+  if (L.ph > avail) py = Math.max(P.ey + 0.9 * s, lim - L.ph);
+  rl.py = py;
+  g.save(); g.translate(W / 2, py); g.scale(pp, pp);
+  rr(g, -pw / 2, 0, pw, L.ph, 20); g.fillStyle = TEAL; g.fill(); g.lineWidth = 4; g.strokeStyle = INK; g.stroke();
+  rr(g, -pw / 2 + 5, 5, pw - 10, L.ph - 10, 15); g.lineWidth = 1.6; g.strokeStyle = 'rgba(255,255,255,.5)'; g.stroke();
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.font = '900 ' + L.nf + 'px ' + FONT;
+  var y = 7 + L.lh / 2 + 1;
+  L.nl.forEach(function(l, k){ g.fillText(l, 0, y + k * L.lh); }); y += L.nl.length * L.lh - L.lh / 2;
+  g.font = '700 12.5px ' + FONT; g.fillStyle = '#D7F4F1'; L.cl.forEach(function(l, k){ g.fillText(l, 0, y + 9 + k * 16); }); y += L.cl.length * 16;
+  if (L.hint){ g.font = '800 11.5px ' + FONT; g.fillStyle = GOLDC; g.fillText('Подними брови или открой рот: ещё раз', 0, y + 14); }
   g.restore();
+}
+/* ---------- Стакан на голове (образ 2) ---------- */
+var cup = { a: 0, av: 0, sw: 0, swv: 0, lvl: 1, so: 0, sq: 0, cool: 0, glug: 0, prevRot: 0, Hc: 200, Wc: 114, base: { x: 0, y: 0 }, A: 0 };
+function cupGeom(){
+  var s = P.s, crownY = P.crown * s + 0.05 * s;
+  var Hc = clamp(s * 1.45, 90, Math.max(90, P.ey + crownY * Math.cos(P.rot) - (SAFET + 62)));
+  var u = clamp(entT / 0.95, 0, 1), off = -(1 - easeOutBounce(u)) * H * 0.9;
+  var y0 = crownY + off;
+  cup.Hc = Hc; cup.Wc = Hc / asp('cup'); cup.off = off; cup.y0 = y0;
+  cup.base.x = P.ex - Math.sin(P.rot) * y0; cup.base.y = P.ey + Math.cos(P.rot) * y0; cup.A = P.rot + cup.a;
+}
+function cupW(px, py){ var c = Math.cos(cup.A), s = Math.sin(cup.A); return { x: cup.base.x + px * c - py * s, y: cup.base.y + px * s + py * c }; }
+function headW(lx, ly){ var c = Math.cos(P.rot), s = Math.sin(P.rot); return { x: P.ex + (lx * c - ly * s) * P.s, y: P.ey + (lx * s + ly * c) * P.s }; }
+function splash(power){
+  SFX.splash(); cup.sq = 0.8;
+  var n = Math.round(4 + power * 8), keys = ['i_pearl', 'i_pearl', 'i_pearl', 'i_coconut', 'i_peach', 'i_lemon', 'i_oreo'];
+  for (var i = 0; i < n; i++){
+    var rimP = cupW(rnd(-0.32, 0.32) * cup.Wc, -cup.Hc * 0.9), a = -Math.PI / 2 + rnd(-0.9, 0.9) + cup.a * 1.2, sp = rnd(340, 760) * (0.6 + power * 0.6);
+    addP({ t: 'spr', k: pick(keys), x: rimP.x, y: rimP.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 1100, rot: rnd(0, TAU), vr: rnd(-9, 9), max: rnd(1.1, 1.7), sz: P.s * rnd(0.15, 0.24) });
+  }
+  for (var j = 0; j < 8; j++){ var rp = cupW(rnd(-0.3, 0.3) * cup.Wc, -cup.Hc * 0.9); drop(rp.x, rp.y, rnd(-260, 260), rnd(-520, -140), '#C58B5B', rnd(3, 6)); }
+  cup.lvl = Math.max(0.3, cup.lvl - 0.05 - power * 0.08);
+  vibrate(14);
+}
+function stepCup(h){
+  if (outfit !== 'B' || state !== 'idle') return;
+  cupGeom();
+  var rotV = (P.rot - cup.prevRot) / h; cup.prevRot = P.rot; rotV = clamp(rotV, -12, 12);
+  var drive = clamp(-hk.ax * 0.0026, -34, 34) - rotV * 1.7;
+  cup.av += (-62 * cup.a - 5.2 * cup.av + drive) * h; cup.a += cup.av * h; cup.a = clamp(cup.a, -0.6, 0.6);
+  cup.swv += (-120 * cup.sw - 3.4 * cup.swv - cup.av * 5.5) * h; cup.sw += cup.swv * h; cup.sw = clamp(cup.sw, -0.8, 0.8);
+  cup.sq = Math.max(0, cup.sq - h * 4);
+  cup.cool -= h;
+  var ah = Math.hypot(hk.ax, hk.ay) / Math.max(60, P.s);
+  if (ah > 30 && cup.cool <= 0 && entT > 1.0){ splash(clamp((ah - 30) / 45, 0, 1)); cup.cool = 0.55; }
+  var A = cup.A;
+  if (Math.abs(A) > 0.62 && cup.lvl > 0.32 && entT > 1.0 && Math.random() < h * 16){
+    var side = A > 0 ? 1 : -1, rp = cupW(side * cup.Wc * 0.4, -cup.Hc * 0.9); drop(rp.x, rp.y, side * rnd(40, 160), rnd(-60, 40), '#C58B5B', rnd(3, 5)); cup.lvl = Math.max(0.3, cup.lvl - h * 0.05);
+  }
+  var wantSip = mouthOpen && P.alpha > 0.5;
+  cup.so = lerp(cup.so, wantSip ? 1 : 0, 1 - Math.exp(-h * (wantSip ? 12 : 8)));
+  if (wantSip && cup.so > 0.7){
+    cup.lvl = Math.max(0.3, cup.lvl - h * 0.16); cup.glug -= h;
+    if (cup.glug <= 0){ cup.glug = 0.32; SFX.glug(); var mp = headW(0.1, 0.52); drop(mp.x, mp.y, rnd(-30, 30), rnd(-80, -20), '#C58B5B', 3); }
+  } else cup.lvl = Math.min(1, cup.lvl + h * 0.14);
+}
+function drawStraw(g){
+  var so = cup.so, s = P.s;
+  var p0 = cupW(cup.Wc * 0.08, -cup.Hc * 0.86);
+  var r1 = cupW(cup.Wc * 0.18, -cup.Hc * 1.12), w1 = headW(1.05, -1.2);
+  var r2 = cupW(cup.Wc * 0.3, -cup.Hc * 1.2), w2 = headW(1.0, 0.05);
+  var r3 = cupW(cup.Wc * 0.34, -cup.Hc * 1.28), w3 = headW(0.16, 0.54);
+  var p1 = { x: lerp(r1.x, w1.x, so), y: lerp(r1.y, w1.y, so) }, p2 = { x: lerp(r2.x, w2.x, so), y: lerp(r2.y, w2.y, so) }, sd = headW(0.98, 0.42), p3 = so < 0.55 ? { x: lerp(r3.x, sd.x, so / 0.55), y: lerp(r3.y, sd.y, so / 0.55) } : { x: lerp(sd.x, w3.x, (so - 0.55) / 0.45), y: lerp(sd.y, w3.y, (so - 0.55) / 0.45) };
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(p0.x, p0.y); g.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+  g.lineWidth = s * 0.1; g.strokeStyle = INK; g.stroke();
+  g.lineWidth = s * 0.06; g.strokeStyle = TEAL; g.stroke();
+  g.lineWidth = s * 0.02; g.strokeStyle = 'rgba(255,255,255,.55)'; g.stroke();
 }
 function drawB(t){
-  drawGarland(t);
-  var g = ctx; faceBegin();
-  g.save(); g.translate(0, -0.56); g.scale(0.92, 0.92); santaHat(g, pomA, LW / 0.92, team, false); g.restore();
-  drawMascot(g, 1.02, 1.3, 0.7, true, mas.sad > 0, mas.jump, mas.big, t);
+  var g = ctx, s = P.s;
+  cupGeom();
+  var im = IM.cup; if (!im) return;
+  var Hc = cup.Hc, Wc = cup.Wc, sq = cup.sq;
+  ext = Math.min(ext, cup.base.y - Hc - 20 - Math.max(0, -cup.off) * 0);
+  // тень на голове
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(cup.base.x, cup.base.y + 2, Wc * 0.36, 7, P.rot, 0, TAU); g.fill();
+  g.save(); g.translate(cup.base.x, cup.base.y); g.rotate(cup.A); g.scale(1 + 0.1 * sq, 1 - 0.1 * sq);
+  var bob = Math.sin(t * 2.4) * 0.006; g.rotate(bob);
+  // пустой стакан (матовый)
+  if (SP.ghost) g.drawImage(SP.ghost, -Wc / 2, -Hc, Wc, Hc);
+  if (IM.logo && cup.lvl < 0.85){
+    var lr = 0.1655 * Wc, lx = -0.021 * Wc, ly = -Hc * 0.417; g.drawImage(IM.logo, lx - lr, ly - lr, lr * 2, lr * 2);
+    g.font = '900 ' + Math.round(Wc * 0.085) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; g.lineWidth = Wc * 0.03; g.strokeStyle = INK; g.strokeText('WEDRINK', lx, ly + lr + Wc * 0.08); g.fillStyle = '#fff'; g.fillText('WEDRINK', lx, ly + lr + Wc * 0.08);
+  }
+  // напиток: до линии уровня, линия остаётся горизонтальной
+  var ys = -Hc * (0.05 + 0.88 * cup.lvl), phi = clamp(-cup.A + cup.sw, -1.0, 1.0);
+  g.save(); g.translate(0, ys); g.rotate(phi); g.beginPath(); g.rect(-Hc * 1.5, 0, Hc * 3, Hc * 2.5); g.restore(); g.clip();
+  g.drawImage(im, -Wc / 2, -Hc, Wc, Hc);
   g.restore();
+  // блик на линии уровня
+  if (cup.lvl < 0.97){
+    g.save(); g.translate(cup.base.x, cup.base.y); g.rotate(cup.A); g.translate(0, ys); g.rotate(phi);
+    g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(-Wc * 0.42, 0); g.lineTo(Wc * 0.42, 0); g.stroke(); g.restore();
+  }
+  drawStraw(g);
 }
 
-/* ---------- Образ В: «Сырная пенка» ---------- */
-var FOAM_BL = [[-0.5, -0.6, 0.17], [-0.36, -0.8, 0.2], [-0.12, -0.94, 0.22], [0.14, -0.96, 0.22], [0.38, -0.82, 0.2], [0.52, -0.6, 0.17],
-  [-0.3, -0.58, 0.2], [0, -0.62, 0.24], [0.3, -0.58, 0.2], [-0.12, -0.74, 0.25], [0.15, -0.74, 0.25], [0.02, -1.12, 0.13], [0.06, -1.23, 0.075]];
-var MUST_BL = [[0, 0.385, 0.07], [-0.09, 0.4, 0.07], [0.09, 0.4, 0.07], [-0.19, 0.41, 0.065], [0.19, 0.41, 0.065], [-0.28, 0.385, 0.055], [0.28, 0.385, 0.055], [-0.33, 0.33, 0.045], [0.33, 0.33, 0.045]];
-var FRUITS = ['peach', 'strawberry', 'grape', 'peach', 'strawberry', 'grape'];
-function drawFruits(t, back){
-  var g = ctx; faceBegin();
-  for (var i = 0; i < FRUITS.length; i++){
-    if ((i % 2 === 0) !== back) continue;
-    var a = t * 0.8 + i * TAU / 6, x = Math.cos(a) * 1.08, y = -0.1 + Math.sin(a) * 0.95 + Math.sin(t * 3 + i) * 0.03, s = 0.4;
-    g.save(); g.translate(x, y); g.rotate(a * 0.6 + Math.sin(t * 2 + i) * 0.3); g.drawImage(SPR[FRUITS[i]], -s / 2, -s / 2, s, s); g.restore();
+/* ---------- Новогодний образ (образ 3) ---------- */
+var win = { hy: 0, hv: 0, ha: 0, hav: 0, gy: 0, gv: 0, cupX: 0, steamT: 0, flakeT: 0, hatInit: false, prevRot: 0 };
+function initSnow(){ snow = []; for (var i = 0; i < 44; i++) snow.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.4, 3.6), vy: rnd(24, 70), ph: rnd(0, TAU) }); }
+function stepWinter(h){
+  if (outfit !== 'C') return;
+  if (!snow.length) initSnow();
+  for (var i = 0; i < snow.length; i++){ var f = snow[i]; f.y += f.vy * h; f.x += Math.sin(clock * 0.8 + f.ph) * 14 * h; if (f.y > H + 8){ f.y = -8; f.x = rnd(0, W); } }
+  if (state !== 'idle') return;
+  win.hv += (-150 * win.hy - 9 * win.hv) * h; win.hy += win.hv * h;
+  var rotV = clamp((P.rot - win.prevRot) / h, -12, 12); win.prevRot = P.rot;
+  win.hav += (-120 * win.ha - 7 * win.hav + clamp(-hk.ax * 0.0016, -22, 22) - rotV * 1.1) * h; win.ha += win.hav * h; win.ha = clamp(win.ha, -0.45, 0.45);
+  win.gv += (-60 * win.gy - 4 * win.gv) * h; win.gy += win.gv * h;
+  if (entFlag === 0 && entT > 0.45){ entFlag = 1; SFX.pop(); win.hv = 0; SFX.jingle(); win.gv = 160; }
+  // пар от горячего стакана
+  var hc = clamp(P.s * 0.95, 80, 140), cx = W - hc * 0.34 - 14, top = H - SAFEB - 138 - hc;
+  win.steamT -= h; var rate = mouthOpen ? 0.05 : 0.1;
+  if (win.steamT <= 0 && entT > 0.6){ win.steamT = rate; addP({ t: 'steam', x: cx + rnd(-8, 8), y: top + 6, vx: rnd(-6, 6), vy: -rnd(36, 64), g: 0, max: 1.9, sz: rnd(16, 26), ph: rnd(0, 6) }); }
+  // изо рта вылетают ингредиенты-снежинки
+  if (mouthOpen && P.alpha > 0.5 && entT > 0.7){
+    win.flakeT -= h;
+    if (win.flakeT <= 0){
+      win.flakeT = 0.085; var sd = Math.random() < 0.5 ? -1 : 1, sp0 = rnd(220, 460), vx0 = sd * sp0, vy0 = -rnd(40, 240);
+      if (Math.random() < 0.3) addP({ t: 'flake', x: P.mouth.x, y: P.mouth.y, vx: vx0, vy: vy0, g: 160, rot: rnd(0, TAU), vr: rnd(-4, 4), max: rnd(1.1, 1.7), sz: P.s * rnd(0.1, 0.16) });
+      else addP({ t: 'spr', k: pick(['i_pearl', 'i_coconut', 'i_peach', 'i_lemon', 'i_oreo']), x: P.mouth.x, y: P.mouth.y, vx: vx0, vy: vy0, g: 240, rot: rnd(0, TAU), vr: rnd(-5, 5), max: rnd(1.2, 1.9), sz: P.s * rnd(0.17, 0.26) });
+    }
   }
-  g.restore();
+}
+function drawGarland(t){
+  var g = ctx, n = 9, ent = clamp(entT / 0.8, 0, 1), dy = -(1 - easeOutBack(ent)) * 160 + win.gy;
+  var y0 = SAFET + 60 + dy, sag = 40, cols = [RED, TEAL, GOLDC, '#fff', '#FF8FA3'];
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  function ptAt(u){ return { x: lerp(-14, W + 14, u), y: y0 + sag * 4 * u * (1 - u) }; }
+  g.strokeStyle = INK; g.lineWidth = 3; g.beginPath(); for (var i = 0; i <= 24; i++){ var q = ptAt(i / 24); if (i) g.lineTo(q.x, q.y); else g.moveTo(q.x, q.y); } g.stroke();
+  for (var b = 0; b < n; b++){
+    var u = (b + 0.5) / n, p = ptAt(u), col = cols[b % cols.length], on = (Math.floor(t * 2.2 + b * 0.7) % 3) !== 0 || REDUCED;
+    var by = p.y + 15, sw = Math.sin(t * 2 + b) * 1.5;
+    if (on){ var gr = g.createRadialGradient(p.x + sw, by, 0, p.x + sw, by, 26); gr.addColorStop(0, col === '#fff' ? 'rgba(255,255,255,.55)' : col); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.globalAlpha = 0.55; g.fillStyle = gr; g.beginPath(); g.arc(p.x + sw, by, 26, 0, TAU); g.fill(); g.globalAlpha = 1; }
+    g.fillStyle = INK; g.fillRect(p.x + sw - 3, p.y - 1, 6, 8);
+    g.fillStyle = col; g.beginPath(); g.ellipse(p.x + sw, by, 7, 10, 0, 0, TAU); g.fill(); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(p.x + sw - 2.5, by - 3, 2, 3.5, 0, 0, TAU); g.fill();
+  }
 }
 function drawC(t){
-  var g = ctx;
-  drawFruits(t, true);
-  faceBegin();
-  // усы из пенки
-  if (mustT > 0){
-    var age = 3 - mustT, k = easeOutBack(clamp(age / 0.3, 0, 1)), fade = clamp(mustT / 0.5, 0, 1);
-    g.save(); g.translate(0, 0.39); g.scale(k, k * (0.4 + 0.6 * fade)); g.translate(0, -0.39); g.globalAlpha = g.globalAlpha * fade;
-    unionBlobs(g, MUST_BL, FOAM, LW * 0.8); g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.ellipse(-0.1, 0.37, 0.06, 0.02, -0.2, 0, TAU); g.fill();
+  var g = ctx, s = P.s, ent = clamp(entT / 0.7, 0, 1);
+  drawGarland(t);
+  // шапка
+  var im = IM.hat;
+  if (im){
+    var hw = 1.9 * s, hh = hw * asp('hat'), dropY = -(1 - easeOutBounce(ent)) * H * 0.7 + win.hy * 0;
+    g.save(); g.translate(P.ex, P.ey); g.rotate(P.rot); g.translate(0, -0.3 * s + dropY); g.rotate(win.ha + 0.07);
+    g.drawImage(im, -hw * 0.52, -hh * 0.93, hw, hh);
+    g.restore();
+    ext = Math.min(ext, P.ey - 0.3 * s - hh * 1.0);
+  }
+  // горячий стакан с паром
+  var hc = clamp(s * 0.95, 80, 140), cw = hc / asp('cup'), cx = W - cw / 2 - 12 + (1 - easeOutBack(clamp((entT - 0.2) / 0.7, 0, 1))) * 220, cy = H - SAFEB - 138 - hc / 2 + Math.sin(t * 2.2) * 3;
+  if (IM.cup){ g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(cx, cy + hc / 2 + 2, cw * 0.42, 6, 0, 0, TAU); g.fill(); dimg(g, 'cup', cx, cy, cw, hc, Math.sin(t * 1.4) * 0.03); }
+}
+
+/* ---------- Игра «Лови ингредиенты» ---------- */
+var IT = {
+  pearl:   { img: 'i_pearl',  pts: 10, sz: 1,    w: 26 },
+  bean:    { img: 'i_bean',   pts: 10, sz: 1.05, w: 10 },
+  coconut: { img: 'i_coconut',pts: 15, sz: 1,    w: 22 },
+  peach:   { img: 'i_peach',  pts: 20, sz: 1,    w: 9 },
+  lemon:   { img: 'i_lemon',  pts: 20, sz: 1.1,  w: 9 },
+  oreo:    { img: 'i_oreo',   pts: 25, sz: 1.05, w: 6 },
+  foam:    { img: 'd_foam_peach', pts: 30, sz: 1.15, w: 6, tall: true, vf: 1.1 },
+  gold:    { img: 'gold',     pts: 50, sz: 1.2,  w: 2, tall: true, vf: 1.5 },
+  x2:      { img: 'x2',  boost: 'x2',   sz: 1.15, w: 3 },
+  slow:    { img: 'slow', boost: 'slow', sz: 1.15, w: 3 },
+  mag:     { img: 'mag',  boost: 'mag',  sz: 1.15, w: 3 },
+  ice:     { img: 'ice',  ice: true,    sz: 1.15, w: 9 }
+};
+var ITK = Object.keys(IT);
+function spawnItem(){
+  var tot = 0, k, i, w;
+  for (i = 0; i < ITK.length; i++){ w = IT[ITK[i]].w; if (ITK[i] === 'ice' && elapsed < 6) w = 0; tot += w; }
+  var r = Math.random() * tot; k = ITK[0];
+  for (i = 0; i < ITK.length; i++){ w = IT[ITK[i]].w; if (ITK[i] === 'ice' && elapsed < 6) w = 0; r -= w; if (r <= 0){ k = ITK[i]; break; } }
+  var d = IT[k], base = clamp(W * 0.14, 44, 66), ww = base * d.sz, hh = d.tall ? ww * asp(d.img === 'gold' ? 'd_tapioca' : d.img) : (SP[d.img] ? ww * SP[d.img].height / SP[d.img].width : ww * asp(d.img));
+  var m = ww * 0.6 + 6;
+  items.push({ k: k, x: rnd(m, W - m), y: -hh, w: ww, h: hh, r: base * 0.5, vy: rnd(0.85, 1.15) * (d.vf || 1), rot: rnd(-0.4, 0.4), vr: rnd(-2.4, 2.4), ph: rnd(0, TAU), sw: Math.random() < 0.3 ? rnd(10, 26) : 0, eat: 0 });
+}
+function stepGame(h){
+  if (state === 'countdown'){
+    cdT -= h; var n = Math.ceil(cdT);
+    if (n !== cdLast){ cdLast = n; if (n > 0){ big(String(n)); SFX.tick(600 + (3 - n) * 140); } }
+    if (cdT <= 0){ state = 'round'; elapsed = 0; spawnT = 0.2; big('Лови!'); SFX.go(); }
+    return;
+  }
+  if (state !== 'round') return;
+  timeLeft -= h; elapsed += h;
+  if (timeLeft <= 0){ timeLeft = 0; endRound(); return; }
+  var prog = elapsed / ROUND, spd = (1 + 0.8 * prog) * (slowT > 0 ? 0.5 : 1), fall = H * 0.3;
+  spawnT -= h; if (spawnT <= 0){ spawnT = lerp(0.5, 0.24, prog) * rnd(0.8, 1.2); spawnItem(); if (prog > 0.4 && Math.random() < 0.3) spawnItem(); }
+  x2T = Math.max(0, x2T - h); slowT = Math.max(0, slowT - h); magT = Math.max(0, magT - h); freezeT = Math.max(0, freezeT - h);
+  if (comboT > 0){ comboT -= h; if (comboT <= 0){ streak = 0; mult = 1; } }
+  var mx = P.mouth.x, my = P.mouth.y, rc = Math.max(24, P.s * 0.36), canOpen = freezeT <= 0 && P.alpha > 0.4;
+  for (var i = items.length - 1; i >= 0; i--){
+    var it = items[i];
+    it.y += fall * it.vy * spd * h; it.rot += it.vr * h; it.ph += h * 2.2; it.x += Math.sin(it.ph) * it.sw * h;
+    var dx = mx - it.x, dy = my - it.y, d = Math.hypot(dx, dy);
+    if (magT > 0 && canOpen && d < P.s * 2.1 && !IT[it.k].ice){ var pull = 520 * h; it.x += dx / d * Math.min(pull, d); it.y += dy / d * Math.min(pull, d) * 0.9; }
+    var open = mouthOpen || magT > 0;
+    if (canOpen && open && d < rc + it.r * 0.35){ onCatch(it); items.splice(i, 1); continue; }
+    if (it.y > H + it.h) items.splice(i, 1);
+  }
+}
+function onCatch(it){
+  var d = IT[it.k], x = it.x, y = it.y;
+  caught++;
+  if (d.ice){
+    score = Math.max(0, score - 20); freezeT = 1; streak = 0; mult = 1; comboT = 0; shakeT = 0.3; flashT = 0.4; SFX.bad(); vibrate([60, 40, 60]);
+    floatText(x, y, '−20', '#BFE9F5'); for (var q = 0; q < 8; q++) addP({ t: 'flake', x: x, y: y, vx: rnd(-220, 220), vy: rnd(-300, -60), g: 500, rot: rnd(0, TAU), vr: rnd(-6, 6), max: 0.9, sz: rnd(8, 14) });
+    mascotMood('m_vau', 1.4); return;
+  }
+  if (d.boost){
+    SFX.boost(); vibrate(20);
+    if (d.boost === 'x2'){ x2T = 5; floatText(x, y, '×2 на 5 с', GOLDC); }
+    else if (d.boost === 'slow'){ slowT = 5; floatText(x, y, 'Замедление', '#BFE9F5'); }
+    else { magT = 3; floatText(x, y, 'Магнит', '#FFB3BD'); }
+    for (var s = 0; s < 6; s++) sparkle(x + rnd(-20, 20), y + rnd(-20, 20), rnd(8, 14), pick(['#fff', GOLDC]));
+    mascotJump('m_ogon'); return;
+  }
+  if (comboT > 0) streak++; else streak = 1;
+  comboT = 2.5; mult = 1 + 0.5 * Math.floor(Math.min(streak, 20) / 5);
+  var gain = Math.round(d.pts * mult * (x2T > 0 ? 2 : 1)); score += gain; popT = 1;
+  floatText(x, y - 8, '+' + gain, it.k === 'gold' ? GOLDC : '#fff');
+  if (it.k === 'gold'){ goldN++; SFX.gold(); big('ЗОЛОТО!'); confetti(x, y, 30); flashT = 0.2; vibrate(40); mascotJump('m_ura'); }
+  else { SFX.coin(Math.min(streak, 12)); burstSpr(x, y, [d.img], 4, 300, it.w * 0.55); if (streak > 0 && streak % 5 === 0){ mascotJump('m_ogon'); confetti(P.mouth.x, P.mouth.y, 12); } }
+}
+function startRound(){
+  audioInit(); closeSheet();
+  state = 'countdown'; cdT = 3; cdLast = 4; score = 0; dispScore = 0; streak = 0; mult = 1; comboT = 0; timeLeft = ROUND; elapsed = 0; caught = 0; goldN = 0;
+  x2T = slowT = magT = freezeT = 0; items = []; parts = []; lastScore = null; flashT = 0;
+  $('hud').classList.add('game'); setHint('', 0); showIntro('G'); mascotMood('m_hmm', 3);
+}
+function endRound(){
+  state = 'result'; photoKind = 'game'; items = []; lastScore = score; $('hud').classList.remove('game'); $('mods').innerHTML = ''; $('mods')._sig = ''; lastDrinks = caught;
+  var e = addResult(score); submitScore(score);
+  var isBest = store.top[0] === e && score > 0;
+  SFX.win(); mascotJump('m_ura'); confetti(W / 2, H * 0.35, 40); vibrate(80);
+  setText($('rTitle'), isBest ? 'Новый рекорд' : 'Раунд окончен');
+  $('rscore').textContent = String(score); $('rDrinks').textContent = 'Поймано: ' + caught + (goldN ? ' · золотых: ' + goldN : '');
+  $('rMeta').textContent = isBest ? 'Лучший результат на этом телефоне' : 'Твой рекорд: ' + bestOf();
+  var ol = $('rList'); ol.innerHTML = '';
+  store.top.forEach(function(r, i){ var li = document.createElement('li'); if (r === e || (r.n === e.n)) li.className = 'me'; li.innerHTML = '<span>' + (i + 1) + '. ' + r.s + '</span><i>' + r.d + '</i>'; ol.appendChild(li); });
+  refreshBest(); $('sheet').classList.remove('photo'); $('sheet').classList.add('on');
+}
+function closeSheet(){ $('sheet').classList.remove('on'); }
+function toIdle(){
+  state = 'idle'; items = []; parts = []; closeSheet(); $('hud').classList.remove('game'); $('mods').innerHTML = '';
+  setHint('', 0); startEntry();
+}
+function startEntry(){
+  entT = 0; entFlag = 0; trigCool = 1.0; cup.lvl = 1; cup.a = cup.av = cup.sw = cup.swv = 0; cup.so = 0; cup.sq = 0; cup.cool = 0.4; win.hy = win.hv = 0; win.ha = win.hav = 0; win.gy = win.gv = 0;
+  rlReset(); mas.tmp = null; if (outfit === 'C') initSnow();
+  showIntro(outfit); SFX.whoosh(); if (outfit === 'A') mascotMood('m_hmm', 99);
+}
+function setOutfit(o){
+  if (o === outfit && state === 'idle') return;
+  outfit = o; store.outfit = o; saveStore(); parts = []; updateDots(); startEntry();
+}
+function nextOutfit(dir){ setOutfit(OUTFITS[(OUTFITS.indexOf(outfit) + dir + OUTFITS.length) % OUTFITS.length]); }
+function step(h){
+  entT += h;
+  if (outfit === 'A' && entFlag === 0 && entT > 0.55){ entFlag = 1; SFX.pop(); }
+  if (outfit === 'B' && entFlag === 0 && entT > 0.34){ entFlag = 1; SFX.pop(); cup.sq = 1; cupGeom(); for (var i = 0; i < 8; i++){ var rp = cupW(rnd(-0.4, 0.4) * cup.Wc, -cup.Hc * 0.92); drop(rp.x, rp.y, rnd(-220, 220), rnd(-380, -100), '#C58B5B', rnd(3, 6)); } }
+  if (popT > 0) popT = Math.max(0, popT - h * 5);
+  if (shakeT > 0) shakeT -= h; if (flashT > 0) flashT -= h;
+  if (mas.jump > 0) mas.jump = Math.max(0, mas.jump - h * 1.8);
+  if (mas.tmpT > 0){ mas.tmpT -= h; if (mas.tmpT <= 0) mas.tmp = null; }
+  stepParts(h); stepRoulette(h); stepCup(h); stepWinter(h); stepGame(h);
+}
+
+/* ---------- Рисование: маскот, логотип, кольцо рта, модификаторы ---------- */
+function drawCorner(t){
+  var g = ctx, key;
+  if (mas.tmp && mas.tmpT > 0) key = mas.tmp;
+  else if (state === 'round' || state === 'countdown') key = 'm_hmm';
+  else if (outfit === 'A') key = rl.st === 'show' ? 'm_ura' : 'm_hmm';
+  else if (outfit === 'B') key = (mouthOpen && cup.so > 0.5) ? 'm_pyet' : 'm_stile';
+  else key = mouthOpen ? 'm_zima_snow' : 'm_zima_kofe';
+  if (!IM[key]) return;
+  var game = state === 'round' || state === 'countdown';
+  var tall = key.indexOf('zima') >= 0, h0 = clamp(H * 0.17, 84, 132) * (tall ? 1.3 : 1), w0 = h0 / asp(key);
+  var onPl = outfit === 'A' && state === 'idle' && rl.st === 'show' && rl.py;
+  if (onPl){ h0 = clamp(H * 0.12, 64, 96); w0 = h0 / asp(key); }
+  var tgt = game ? H - SAFEB - 16 : onPl ? rl.py + 10 : H - SAFEB - 128;
+  mas.y = mas.y ? lerp(mas.y, tgt, 0.12) : tgt;
+  var jp = mas.jump, jy = -Math.sin(jp * Math.PI) * 30, sq = 1 + Math.sin(jp * Math.PI) * 0.08;
+  var bob = Math.sin(t * 2.6) * 2.5, slideIn = (1 - easeOutBack(clamp(entT / 0.8, 0, 1)));
+  var x = 8 + w0 / 2 - slideIn * 160;
+  g.save(); g.translate(x, mas.y + jy + bob); g.rotate(Math.sin(t * 1.8) * 0.04 + (jp > 0 ? Math.sin(jp * 14) * 0.08 : 0)); g.scale(1 / sq, sq);
+  g.drawImage(IM[key], -w0 / 2, -h0, w0, h0);
+  g.restore();
+}
+function drawLogoPill(g){
+  var w = clamp(W * 0.42, 124, 164), h = 40, x = W / 2 - w / 2, y = SAFET + 8;
+  rr(g, x, y, w, h, 20); g.fillStyle = CREAM; g.fill(); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+  if (IM.logo){ g.save(); g.beginPath(); g.arc(x + 23, y + h / 2, 17, 0, TAU); g.fillStyle = '#fff'; g.fill(); g.restore(); g.drawImage(IM.logo, x + 7, y + h / 2 - 16, 32, 32); }
+  g.font = '900 17px ' + FONT; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillStyle = TEAL; g.fillText('WEDRINK', x + 46, y + h / 2 + 1);
+}
+function drawGameOverlay(t){
+  var g = ctx; if (P.alpha < 0.05) return;
+  var rc = Math.max(24, P.s * 0.36), mx = P.mouth.x, my = P.mouth.y;
+  g.save(); g.globalAlpha = P.alpha;
+  if (magT > 0){ g.strokeStyle = 'rgba(255,179,189,.85)'; g.lineWidth = 4; g.setLineDash([10, 10]); g.beginPath(); g.arc(mx, my, P.s * 2.1 * (0.9 + 0.1 * Math.sin(t * 9)), 0, TAU); g.stroke(); g.setLineDash([]); }
+  var open = mouthOpen && freezeT <= 0;
+  g.lineWidth = 5; g.strokeStyle = open ? GOLDC : '#fff'; g.fillStyle = open ? 'rgba(255,210,63,.28)' : 'rgba(255,255,255,.12)';
+  g.setLineDash([9, 8]); g.lineDashOffset = -t * 20; g.beginPath(); g.arc(mx, my, rc, 0, TAU); g.fill(); g.stroke(); g.setLineDash([]);
+  if (freezeT > 0){ g.fillStyle = 'rgba(191,233,245,.7)'; g.beginPath(); g.arc(mx, my, rc * 1.15, 0, TAU); g.fill(); g.lineCap = 'round'; flake(g, mx, my, rc * 0.7, 5, INK); flake(g, mx, my, rc * 0.7, 2.6, '#fff'); }
+  g.restore();
+}
+function updateMods(){
+  var box = $('mods'), want = [];
+  if (state === 'round'){
+    if (x2T > 0) want.push(['x', '×2 · ' + x2T.toFixed(1)]);
+    if (slowT > 0) want.push(['s', 'Замедление · ' + slowT.toFixed(1)]);
+    if (magT > 0) want.push(['m', 'Магнит · ' + magT.toFixed(1)]);
+    if (freezeT > 0) want.push(['s', 'Рот заморожен']);
+  }
+  var sig = want.map(function(w){ return w[0] + w[1]; }).join('|');
+  if (box._sig === sig) return; box._sig = sig; box.innerHTML = '';
+  want.forEach(function(w){ var c = document.createElement('div'); c.className = 'chip ' + w[0]; c.textContent = w[1]; box.appendChild(c); });
+}
+function drawItems(g){
+  for (var j = 0; j < items.length; j++){
+    var b = items[j]; g.save(); g.translate(b.x, b.y); g.rotate(b.rot);
+    var d = IT[b.k], im = SP[d.img] || IM[d.img];
+    if (im){
+      if (d.boost || d.ice || b.k === 'gold'){ var pulse = 1 + Math.sin(clock * 6 + b.ph) * 0.05; g.scale(pulse, pulse); }
+      g.drawImage(im, -b.w / 2, -b.h / 2, b.w, b.h);
+    }
     g.restore();
   }
-  // шапка из пенки, капли поверх
-  var pulse = fillT > 0 ? 1 + 0.06 * Math.sin(fillT * 12) : 1;
-  g.save(); g.translate(0, -0.45); g.scale(pulse, pulse); g.translate(0, 0.45);
-  unionBlobs(g, FOAM_BL, FOAM, LW);
-  g.strokeStyle = '#F0D79C'; g.lineWidth = 0.03; g.lineCap = 'round';
-  [[-0.3, -0.58, 0.2], [0, -0.62, 0.24], [0.3, -0.58, 0.2]].forEach(function(b){ g.beginPath(); g.arc(b[0], b[1], b[2] - 0.035, 0.35 * Math.PI, 0.72 * Math.PI); g.stroke(); });
-  g.fillStyle = 'rgba(255,255,255,.95)'; g.beginPath(); g.ellipse(-0.24, -0.9, 0.1, 0.045, -0.5, 0, TAU); g.fill(); g.beginPath(); g.ellipse(0.0, -1.0, 0.05, 0.025, -0.4, 0, TAU); g.fill();
-  g.save(); g.translate(0.2, -0.7); g.rotate(-0.12); g.scale(0.01, 0.01); g.textAlign = 'center'; g.textBaseline = 'middle'; fitFont(g, 'WEDRINK', 60, 14); g.fillStyle = RED; g.fillText('WEDRINK', 0, 0); g.restore();
-  g.restore();
-  drips.forEach(function(d){
-    var yb = -0.385 + d.L;
-    g.strokeStyle = INK; g.lineWidth = LW * 2; g.beginPath(); g.moveTo(d.x - 0.05, -0.385); g.lineTo(d.x - 0.05, yb); g.arc(d.x, yb, 0.05, Math.PI, 0, true); g.lineTo(d.x + 0.05, -0.385); g.stroke();
-    g.fillStyle = FOAM; g.beginPath(); g.moveTo(d.x - 0.05, -0.43); g.lineTo(d.x - 0.05, yb); g.arc(d.x, yb, 0.05, Math.PI, 0, true); g.lineTo(d.x + 0.05, -0.43); g.closePath(); g.fill();
-    g.fillStyle = '#fff'; g.beginPath(); g.ellipse(d.x - 0.02, yb - 0.01, 0.012, 0.025, 0, 0, TAU); g.fill();
-  });
-  g.restore();
-  drawFruits(t, false);
 }
 
 /* ---------- Маска целиком ---------- */
 function drawMask(t){
-  if (P.alpha < 0.01) return;
-  var g = ctx, e = easeOutBack(swapT);
-  g.save();
-  g.globalAlpha = P.alpha * clamp(swapT * 2.4, 0.2, 1);
-  if (swapT < 1){ g.translate(P.ex, P.ey); g.scale(0.85 + 0.15 * e, 0.85 + 0.15 * e); g.translate(-P.ex, -P.ey); }
-  drawBlush(P.chL, 1); drawBlush(P.chR, -1);
+  if (P.alpha < 0.01 || state !== 'idle') return;
+  var g = ctx;
+  g.save(); g.globalAlpha = P.alpha;
   if (outfit === 'A') drawA(t); else if (outfit === 'B') drawB(t); else drawC(t);
   g.restore();
+}
+
+/* ---------- Демо-лицо (режим ?demo=1, без камеры и без библиотеки) ---------- */
+var demo = { x: 0, t: 0, n: 0, cur: null, wrong: false };
+function demoPose(dt){
+  demo.t += dt; var t = demo.t;
+  var s = Math.min(W * 0.36, H * 0.24);
+  var cy = H * 0.5 + Math.sin(t * 1.3) * H * 0.008;
+  var tx = W / 2 + Math.sin(t * 0.9) * W * 0.07, ph = t % 4.4, jaw = (ph > 1.3 && ph < 2.9) ? 0.7 : 0.05;
+  var rot = Math.sin(t * 0.8) * 0.24;
+  if (qs.get('open') === '1' && state === 'idle') jaw = 0.7;
+  if (state === 'idle' && outfit === 'B' && (t % 7.5) > 6.3) tx += Math.sin(t * 16) * W * 0.07;
+  if (!demo.x) demo.x = W / 2;
+  var mouthY = cy + 0.5 * s, best = null, i, b;
+  if (state === 'round'){
+    if (!demo.cur || demo.cur.y > mouthY + 30 || items.indexOf(demo.cur) < 0){
+      demo.cur = null; demo.n++; demo.wrong = demo.n % 7 === 5;
+      for (i = 0; i < items.length; i++){ b = items[i]; if (b.y > mouthY - 20 || b.y < 0 || b.x < s * 0.85 || b.x > W - s * 0.85) continue; if (!!IT[b.k].ice === demo.wrong && (!demo.cur || b.y > demo.cur.y)) demo.cur = b; }
+    }
+    best = demo.cur;
+    if (best){ tx = best.x; if (Math.abs(best.x - demo.x) < s * 0.2 && mouthY - best.y < s * 0.8) jaw = 0.7; else jaw = 0.05; } else jaw = 0.05;
+  }
+  tx = clamp(tx, s * 0.8, Math.max(s * 0.8, W - s * 0.8));
+  demo.x += (tx - demo.x) * Math.min(1, dt * 4);
+  if (state === 'round') rot = clamp((tx - demo.x) * 0.002, -0.2, 0.2) + Math.sin(t * 0.9 + 1) * 0.08;
+  var cs = Math.cos(rot), sn = Math.sin(rot);
+  function L(lx, ly){ return { x: demo.x + (lx * cs - ly * sn) * s, y: cy + (lx * sn + ly * cs) * s }; }
+  T.eL = L(-0.238, 0); T.eR = L(0.238, 0); T.fore = L(0, -0.5); T.chin = L(0, 0.88); T.mouth = L(0, 0.5 + 0.05 * jaw);
+  T.jaw = jaw; T.brow = 0; T.has = true;
+}
+function drawDemoFace(){
+  var g = ctx, s = P.s, e = mid(P.eL, P.eR);
+  g.save(); g.translate(e.x, e.y); g.rotate(P.rot); g.scale(s, s); g.lineJoin = 'round'; g.lineCap = 'round';
+  g.fillStyle = '#E4A98C'; g.fillRect(-0.16, 0.6, 0.32, 0.5);
+  g.fillStyle = '#6B3F36'; g.beginPath(); g.moveTo(-0.62, 1.8); g.bezierCurveTo(-0.9, 0.6, -0.8, -0.8, 0, -0.84); g.bezierCurveTo(0.8, -0.8, 0.9, 0.6, 0.62, 1.8); g.closePath(); g.fill();
+  var gr = g.createLinearGradient(0, 0.9, 0, 2); gr.addColorStop(0, '#6FB7B5'); gr.addColorStop(1, '#4F9A98');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(-1.5, 2.6); g.bezierCurveTo(-1.45, 1.2, -0.7, 0.95, -0.28, 0.9); g.lineTo(0.28, 0.9); g.bezierCurveTo(0.7, 0.95, 1.45, 1.2, 1.5, 2.6); g.closePath(); g.fill();
+  g.fillStyle = '#F2C9A8'; g.beginPath(); g.ellipse(0, 0.16, 0.5, 0.7, 0, 0, TAU); g.fill();
+  g.fillStyle = '#6B3F36'; g.beginPath(); g.moveTo(-0.52, 0); g.bezierCurveTo(-0.6, -0.6, -0.2, -0.78, 0.05, -0.74); g.bezierCurveTo(0.35, -0.7, 0.6, -0.5, 0.52, 0); g.bezierCurveTo(0.4, -0.35, 0.15, -0.5, -0.1, -0.42); g.bezierCurveTo(-0.3, -0.36, -0.45, -0.25, -0.52, 0); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.ellipse(-0.238, 0, 0.1, 0.062, 0, 0, TAU); g.ellipse(0.238, 0, 0.1, 0.062, 0, 0, TAU); g.fill();
+  g.fillStyle = '#2b2220'; g.beginPath(); g.arc(-0.238, 0, 0.052, 0, TAU); g.arc(0.238, 0, 0.052, 0, TAU); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(-0.222, -0.016, 0.014, 0, TAU); g.arc(0.254, -0.016, 0.014, 0, TAU); g.fill();
+  g.strokeStyle = '#4a342b'; g.lineWidth = 0.022; g.beginPath(); g.moveTo(-0.36, -0.13); g.lineTo(-0.12, -0.15); g.moveTo(0.12, -0.15); g.lineTo(0.36, -0.13); g.stroke();
+  g.strokeStyle = '#d9a583'; g.beginPath(); g.moveTo(0, 0.05); g.lineTo(-0.04, 0.28); g.lineTo(0.04, 0.3); g.stroke();
+  var o = clamp(P.jaw, 0, 1);
+  g.fillStyle = '#7a1f2b'; g.beginPath(); g.ellipse(0, 0.5 + o * 0.04, 0.12 + o * 0.03, 0.025 + o * 0.12, 0, 0, TAU); g.fill();
+  g.strokeStyle = '#d35a6b'; g.lineWidth = 0.028; g.stroke();
+  g.restore();
+}
+
+/* ---------- Главный цикл ---------- */
+function updateKin(dt){
+  if (!hk.init){ hk.x = P.ex; hk.y = P.ey; hk.init = true; return; }
+  var vx = (P.ex - hk.x) / dt, vy = (P.ey - hk.y) / dt; hk.x = P.ex; hk.y = P.ey;
+  var nvx = lerp(hk.vx, vx, 1 - Math.exp(-dt * 18)), nvy = lerp(hk.vy, vy, 1 - Math.exp(-dt * 18));
+  var k = 1 - Math.exp(-dt * 14);
+  hk.ax = lerp(hk.ax, clamp((nvx - hk.vx) / dt, -9000, 9000), k); hk.ay = lerp(hk.ay, clamp((nvy - hk.vy) / dt, -9000, 9000), k);
+  hk.vx = nvx; hk.vy = nvy;
+}
+function frame(now){
+  requestAnimationFrame(frame);
+  var dt = Math.min(0.1, Math.max(0.0005, (now - lastT) / 1000)); lastT = now;
+  if (!gameActive || paused) return;
+  clock += dt;
+  if (DEMO) demoPose(dt); else detect(now);
+  if (T.has && (firstFace || !P.has)){ KEYS.forEach(function(k){ P[k].x = T[k].x; P[k].y = T[k].y; }); P.jaw = T.jaw; P.brow = T.brow; firstFace = false; }
+  if (T.has){
+    // адаптивное сглаживание: мелкая дрожь гасится, быстрые движения идут без лага
+    var sc0 = Math.max(40, Math.hypot(P.eR.x - P.eL.x, P.eR.y - P.eL.y) * 2.1);
+    var d0 = Math.hypot(T.eL.x - P.eL.x, T.eL.y - P.eL.y) / sc0, rate = 9 + 45 * clamp(d0 / 0.1, 0, 1), a = 1 - Math.exp(-dt * rate);
+    KEYS.forEach(function(k){ P[k].x = lerp(P[k].x, T[k].x, a); P[k].y = lerp(P[k].y, T[k].y, a); });
+  }
+  P.jaw = lerp(P.jaw, T.jaw, 1 - Math.exp(-dt * 28));
+  P.brow = lerp(P.brow, T.brow, 1 - Math.exp(-dt * 22));
+  P.has = T.has; P.lost = T.has ? 0 : P.lost + dt;
+  P.alpha = clamp(P.alpha + (T.has ? 1 : -1) * dt * 5, 0, 1);
+  var dx = P.eR.x - P.eL.x, dy = P.eR.y - P.eL.y;
+  P.s = Math.max(40, Math.hypot(dx, dy) * 2.1); P.rot = Math.atan2(dy, dx);
+  P.ex = (P.eL.x + P.eR.x) / 2; P.ey = (P.eL.y + P.eR.y) / 2;
+  var cd = Math.hypot(P.fore.x - P.ex, P.fore.y - P.ey) / P.s; P.crown = lerp(P.crown, -(cd + 0.2), 1 - Math.exp(-dt * 6));
+  updateKin(dt);
+  if (!mouthOpen && P.jaw > 0.3) mouthOpen = true; else if (mouthOpen && P.jaw < 0.18) mouthOpen = false;
+  if (P.alpha < 0.3) mouthOpen = false;
+  if (mouthOpen) mouthOpenT += dt; else mouthOpenT = 0;
+  // триггер: поднять брови или открыть рот (по фронту, с паузой между срабатываниями)
+  trigCool -= dt;
+  var hi = P.jaw > 0.42 || P.brow > 0.5;
+  if (hi && !trigHeld && P.alpha > 0.5){ trigHeld = true; if (trigCool <= 0){ trigCool = 1.1; onTrigger(); } }
+  else if (!hi && P.jaw < 0.25 && P.brow < 0.3) trigHeld = false;
+  acc += dt; var n = 0;
+  while (acc >= STEP && n < 8){ step(STEP); acc -= STEP; n++; }
+  if (n >= 8) acc = 0;
+  if (state !== 'idle'){ dispScore += (score - dispScore) * Math.min(1, dt * 12); if (Math.abs(score - dispScore) < 0.5) dispScore = score; }
+  if (popT > 0) $('score').style.transform = 'scale(' + (1 + popT * 0.22) + ')'; else if ($('score').style.transform) $('score').style.transform = '';
+  setScoreUI();
+  if (state === 'round' || state === 'countdown'){
+    var tl = Math.ceil(timeLeft); setText($('gt'), String(state === 'countdown' ? ROUND : tl));
+    $('gt').classList.toggle('low', state === 'round' && timeLeft <= 5);
+    $('tbar').style.transform = 'scaleX(' + clamp(timeLeft / ROUND, 0, 1) + ')';
+    var cb = $('combo'); if (state === 'round' && streak >= 3 && comboT > 0){ setText(cb, 'Серия ' + streak + ' · ×' + (mult * (x2T > 0 ? 2 : 1))); cb.classList.add('on'); } else cb.classList.remove('on');
+    updateMods();
+  } else { $('tbar').style.transform = 'scaleX(0)'; $('combo').classList.remove('on'); }
+  var h = $('hint');
+  if (hintT > 0){ hintT -= dt; if (hintT <= 0 && h.textContent !== 'Покажи лицо в кадре') h.style.opacity = 0; }
+  if (!DEMO && P.lost > 1 && state !== 'result'){ h.textContent = 'Покажи лицо в кадре'; h.style.opacity = 1; }
+  else if (h.textContent === 'Покажи лицо в кадре'){ h.textContent = ''; h.style.opacity = 0; }
+  render(clock, dt);
+}
+function render(t, dt){
+  var g = ctx; ext = 9999;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.fillStyle = INK; g.fillRect(0, 0, W, H);
+  g.save();
+  if (shakeT > 0 && !photoMode) g.translate(rnd(-5, 5), rnd(-5, 5));
+  if (DEMO){
+    var bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2b6f73'); bg.addColorStop(1, '#173a3c');
+    g.fillStyle = bg; g.fillRect(-10, -10, W + 20, H + 20);
+    if (P.alpha > 0.01){ g.globalAlpha = P.alpha; drawDemoFace(); g.globalAlpha = 1; }
+  } else if (video.readyState >= 2){
+    updateVM();
+    g.save(); g.translate(W, 0); g.scale(-1, 1); g.drawImage(video, vm.ox, vm.oy, vm.dw, vm.dh); g.restore();
+  }
+  if (outfit === 'C' && state === 'idle' && !REDUCED){ g.fillStyle = 'rgba(255,255,255,.85)'; for (var m = 0; m < snow.length; m++){ var fl = snow[m]; g.beginPath(); g.arc(fl.x, fl.y, fl.r, 0, TAU); g.fill(); } }
+  drawMask(t);
+  if (state === 'round' || state === 'countdown' || state === 'result'){ if (!photoMode && state !== 'result') drawGameOverlay(t); drawItems(g); }
+  drawParts();
+  if (!photoMode){
+    drawCorner(t); drawPlaque();
+    if (state === 'idle' || state === 'result') drawLogoPill(g);
+  }
+  if (flashT > 0 && !photoMode){ g.fillStyle = 'rgba(220,34,60,' + clamp(flashT * 0.8, 0, 0.3) + ')'; g.fillRect(-10, -10, W + 20, H + 20); }
+  g.restore();
+}
+function enterMask(){
+  gameActive = true; paused = false; firstFace = true; P.ex = W / 2; P.ey = H / 2; P.alpha = 0; P.has = false; T.has = false; hk.init = false;
+  hideScreens(); toIdle(); lastT = performance.now(); updateDots();
 }
 
 /* ---------- Камера и библиотека ---------- */
@@ -1074,6 +1169,7 @@ function getCamera(){
   });
 }
 function begin(){
+  audioInit();
   if (DEMO){ enterMask(); return; }
   var secure = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (!secure){ showError(IN_APP ? 'inapp' : 'insecure'); return; }
@@ -1100,189 +1196,11 @@ function begin(){
     else showError('other', 'Попробуй открыть ссылку в браузере телефона.');
   });
 }
-
 $('bCopy').addEventListener('click', function(){
   var url = pageLink(), inp = $('linkInput');
   function fallback(){ inp.focus(); inp.select(); try { inp.setSelectionRange(0, 9999); } catch (e) {} var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} toast(ok ? 'Ссылка скопирована' : 'Выдели ссылку и скопируй вручную'); }
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function(){ toast('Ссылка скопирована'); }, fallback); else fallback();
 });
-
-
-/* ---------- Демо-лицо (режим ?demo=1, без камеры и без библиотеки) ---------- */
-var demo = { x: 0, t: 0, n: 0, cur: null, wrong: false };
-function demoPose(dt){
-  demo.t += dt; var t = demo.t;
-  var s = Math.min(W * 0.36, H * 0.24);
-  var cy = H * 0.5 + Math.sin(t * 1.3) * H * 0.008;
-  var tx = W / 2 + Math.sin(t * 0.9) * W * 0.07, ph = t % 4.4, jaw = (ph > 1.3 && ph < 2.9) ? 0.7 : 0.05;
-  var rot = Math.sin(t * 0.8) * 0.24;
-  if (state === 'idle' && (t % 7.5) > 6.3) tx += Math.sin(t * 16) * W * 0.07;   // резкая тряска: шарики подпрыгивают
-  if (!demo.x) demo.x = W / 2;
-  var mouthY = cy + 0.5 * s, best = null, i, b;
-  if (state === 'round'){
-    var need = function(k){ return order && order.ing.indexOf(k) >= 0 && order.got.indexOf(k) < 0; };
-    if (!demo.cur || demo.cur.eat || demo.cur.y > mouthY + 30 || items.indexOf(demo.cur) < 0){
-      demo.cur = null; demo.n++; demo.wrong = demo.n % 6 === 5;
-      for (i = 0; i < items.length; i++){ b = items[i]; if (b.eat || b.y > mouthY - 20 || b.x < s * 0.85 || b.x > W - s * 0.85) continue; if (need(b.k) !== demo.wrong && (!demo.cur || b.y > demo.cur.y)) demo.cur = b; }
-    }
-    best = demo.cur;
-    if (best){ tx = best.x; if (Math.abs(best.x - demo.x) < s * 0.2 && mouthY - best.y < s * 0.8) jaw = 0.7; else jaw = 0.05; }
-    else jaw = 0.05;
-  }
-  tx = clamp(tx, s * 0.8, Math.max(s * 0.8, W - s * 0.8));
-  demo.x += (tx - demo.x) * Math.min(1, dt * 4);
-  if (state === 'round') rot = clamp((tx - demo.x) * 0.002, -0.2, 0.2) + Math.sin(t * 0.9 + 1) * 0.08;
-  var cs = Math.cos(rot), sn = Math.sin(rot);
-  function L(lx, ly){ return { x: demo.x + (lx * cs - ly * sn) * s, y: cy + (lx * sn + ly * cs) * s }; }
-  T.eL = L(-0.238, 0); T.eR = L(0.238, 0); T.fore = L(0, -0.5); T.chin = L(0, 0.88); T.mouth = L(0, 0.5 + 0.05 * jaw); T.chL = L(-0.33, 0.28); T.chR = L(0.33, 0.28);
-  T.jaw = jaw; T.has = true;
-}
-function drawDemoFace(){
-  var g = ctx, s = P.s, e = mid(P.eL, P.eR);
-  g.save(); g.translate(e.x, e.y); g.rotate(P.rot); g.scale(s, s); g.lineJoin = 'round'; g.lineCap = 'round';
-  g.fillStyle = '#E4A98C'; g.fillRect(-0.16, 0.6, 0.32, 0.5);
-  g.fillStyle = '#6B3F36'; g.beginPath(); g.moveTo(-0.62, 1.8); g.bezierCurveTo(-0.9, 0.6, -0.8, -0.8, 0, -0.84); g.bezierCurveTo(0.8, -0.8, 0.9, 0.6, 0.62, 1.8); g.closePath(); g.fill();
-  var gr = g.createLinearGradient(0, 0.9, 0, 2); gr.addColorStop(0, '#6FB7B5'); gr.addColorStop(1, '#4F9A98');
-  g.fillStyle = gr; g.beginPath(); g.moveTo(-1.5, 2.6); g.bezierCurveTo(-1.45, 1.2, -0.7, 0.95, -0.28, 0.9); g.lineTo(0.28, 0.9); g.bezierCurveTo(0.7, 0.95, 1.45, 1.2, 1.5, 2.6); g.closePath(); g.fill();
-  g.fillStyle = '#F2C9A8'; g.beginPath(); g.ellipse(0, 0.16, 0.5, 0.7, 0, 0, TAU); g.fill();
-  g.fillStyle = '#6B3F36'; g.beginPath(); g.moveTo(-0.52, 0); g.bezierCurveTo(-0.6, -0.6, -0.2, -0.78, 0.05, -0.74); g.bezierCurveTo(0.35, -0.7, 0.6, -0.5, 0.52, 0); g.bezierCurveTo(0.4, -0.35, 0.15, -0.5, -0.1, -0.42); g.bezierCurveTo(-0.3, -0.36, -0.45, -0.25, -0.52, 0); g.fill();
-  g.fillStyle = '#fff'; g.beginPath(); g.ellipse(-0.238, 0, 0.1, 0.062, 0, 0, TAU); g.ellipse(0.238, 0, 0.1, 0.062, 0, 0, TAU); g.fill();
-  g.fillStyle = '#2b2220'; g.beginPath(); g.arc(-0.238, 0, 0.052, 0, TAU); g.arc(0.238, 0, 0.052, 0, TAU); g.fill();
-  g.fillStyle = '#fff'; g.beginPath(); g.arc(-0.222, -0.016, 0.014, 0, TAU); g.arc(0.254, -0.016, 0.014, 0, TAU); g.fill();
-  g.strokeStyle = '#4a342b'; g.lineWidth = 0.022; g.beginPath(); g.moveTo(-0.36, -0.13); g.lineTo(-0.12, -0.15); g.moveTo(0.12, -0.15); g.lineTo(0.36, -0.13); g.stroke();
-  g.strokeStyle = '#d9a583'; g.beginPath(); g.moveTo(0, 0.05); g.lineTo(-0.04, 0.28); g.lineTo(0.04, 0.3); g.stroke();
-  var o = clamp(P.jaw, 0, 1);
-  g.fillStyle = '#7a1f2b'; g.beginPath(); g.ellipse(0, 0.5 + o * 0.04, 0.12 + o * 0.03, 0.025 + o * 0.12, 0, 0, TAU); g.fill();
-  g.strokeStyle = '#d35a6b'; g.lineWidth = 0.028; g.stroke();
-  g.restore();
-}
-
-/* ---------- Главный цикл ---------- */
-function updateKin(dt){
-  if (!hk.init){ hk.x = P.ex; hk.y = P.ey; hk.init = true; return; }
-  var vx = (P.ex - hk.x) / dt, vy = (P.ey - hk.y) / dt; hk.x = P.ex; hk.y = P.ey;
-  var nvx = lerp(hk.vx, vx, 1 - Math.exp(-dt * 18)), nvy = lerp(hk.vy, vy, 1 - Math.exp(-dt * 18));
-  var k = 1 - Math.exp(-dt * 14);
-  hk.ax = lerp(hk.ax, clamp((nvx - hk.vx) / dt, -9000, 9000), k); hk.ay = lerp(hk.ay, clamp((nvy - hk.vy) / dt, -9000, 9000), k);
-  hk.vx = nvx; hk.vy = nvy;
-}
-function onSip(){
-  if (state !== 'idle') return;
-  if (outfit === 'A') happyT = 2;
-  else if (outfit === 'C'){ mustT = 3; burst(P.mouth.x, P.mouth.y, FOAM, 8); }
-  mascotJump(false);
-}
-function frame(now){
-  requestAnimationFrame(frame);
-  var dt = Math.min(0.1, Math.max(0.0005, (now - lastT) / 1000)); lastT = now;
-  if (!gameActive || paused) return;
-  clock += dt;
-  if (DEMO) demoPose(dt); else detect(now);
-  if (T.has && (firstFace || !P.has)){ KEYS.forEach(function(k){ P[k].x = T[k].x; P[k].y = T[k].y; }); P.jaw = T.jaw; firstFace = false; }
-  var a = 1 - Math.exp(-dt * 20);
-  if (T.has) KEYS.forEach(function(k){ P[k].x = lerp(P[k].x, T[k].x, a); P[k].y = lerp(P[k].y, T[k].y, a); });
-  P.jaw = lerp(P.jaw, T.jaw, 1 - Math.exp(-dt * 28));
-  P.has = T.has; P.lost = T.has ? 0 : P.lost + dt;
-  P.alpha = clamp(P.alpha + (T.has ? 1 : -1) * dt * 5, 0, 1);
-  var dx = P.eR.x - P.eL.x, dy = P.eR.y - P.eL.y;
-  P.s = Math.max(40, Math.hypot(dx, dy) * 2.1); P.rot = Math.atan2(dy, dx);
-  P.ex = (P.eL.x + P.eR.x) / 2; P.ey = (P.eL.y + P.eR.y) / 2;
-  updateKin(dt);
-  var wasOpen = mouthOpen;
-  if (!mouthOpen && P.jaw > 0.3) mouthOpen = true; else if (mouthOpen && P.jaw < 0.18) mouthOpen = false;
-  if (P.alpha < 0.3) mouthOpen = false;
-  if (mouthOpen) mouthOpenT += dt;
-  if (wasOpen && !mouthOpen){ if (mouthOpenT > 0.3) onSip(); mouthOpenT = 0; }
-  acc += dt; var n = 0;
-  while (acc >= STEP && n < 8){ step(STEP); acc -= STEP; n++; }
-  if (n >= 8) acc = 0;
-  if (state !== 'idle'){
-    dispScore += (score - dispScore) * Math.min(1, dt * 12); if (Math.abs(score - dispScore) < 0.5) dispScore = score;
-  }
-  if (popT > 0) $('score').style.transform = 'scale(' + (1 + popT * 0.22) + ')'; else if ($('score').style.transform) $('score').style.transform = '';
-  setScoreUI();
-  var h = $('hint');
-  if (hintT > 0){ hintT -= dt; if (hintT <= 0 && h.textContent !== 'Покажи лицо в кадре') h.style.opacity = 0; }
-  if (!DEMO && P.lost > 1 && state !== 'result'){ h.textContent = 'Покажи лицо в кадре'; h.style.opacity = 1; }
-  else if (h.textContent === 'Покажи лицо в кадре'){ h.textContent = ''; h.style.opacity = 0; }
-  render(clock, dt);
-}
-
-var masY = 0, photoMode = false;
-function drawDoneCup(g){
-  var k = easeOutBack(clamp(doneCup.t / 0.35, 0, 1)), fade = clamp((1.3 - doneCup.t) / 0.25, 0, 1);
-  var S = clamp(P.s * 0.8, 70, 120), cx = clamp(P.ex, S, W - S), cy = Math.max(SAFET + 190 + S * 0.3, P.ey - P.s * 1.95 - S * 0.6 - doneCup.t * 12);
-  g.save(); g.globalAlpha = fade; g.translate(cx, cy); g.scale(k, k); g.lineJoin = 'round'; g.lineCap = 'round';
-  var lw = Math.max(3, S * 0.05), tw = S * 0.5, bw = S * 0.38, hgt = S * 0.95;
-  g.strokeStyle = INK; g.lineWidth = lw * 1.4; g.beginPath(); g.moveTo(S * 0.1, -hgt * 0.5); g.lineTo(S * 0.22, -hgt * 0.95); g.stroke();
-  g.strokeStyle = RED; g.lineWidth = lw * 0.8; g.stroke();
-  g.beginPath(); g.moveTo(-tw, -hgt * 0.5); g.lineTo(tw, -hgt * 0.5); g.lineTo(bw, hgt * 0.5); g.lineTo(-bw, hgt * 0.5); g.closePath();
-  g.fillStyle = 'rgba(255,255,255,.85)'; g.fill();
-  g.save(); g.clip(); g.fillStyle = doneCup.col; g.fillRect(-tw, -hgt * 0.28, tw * 2, hgt); g.fillStyle = FOAM; g.fillRect(-tw, -hgt * 0.34, tw * 2, hgt * 0.08);
-  g.fillStyle = '#5B3A2F'; [[-0.2, 0.38], [0, 0.4], [0.2, 0.38], [-0.1, 0.28], [0.1, 0.28]].forEach(function(p){ g.beginPath(); g.arc(p[0] * S, p[1] * hgt, S * 0.06, 0, TAU); g.fill(); });
-  g.restore();
-  g.beginPath(); g.moveTo(-tw, -hgt * 0.5); g.lineTo(tw, -hgt * 0.5); g.lineTo(bw, hgt * 0.5); g.lineTo(-bw, hgt * 0.5); g.closePath(); g.lineWidth = lw; g.strokeStyle = INK; g.stroke();
-  rr(g, -tw * 1.12, -hgt * 0.58, tw * 2.24, hgt * 0.12, hgt * 0.05); g.fillStyle = '#fff'; g.fill(); g.stroke();
-  g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(-tw * 0.72, -hgt * 0.2, S * 0.05, hgt * 0.45);
-  // подпись названия
-  g.font = '900 14px ' + FONT; var lines = wrap2(g, doneCup.name, Math.min(W - 24, 230)), lh = 17, bh = lines.length * lh + 10, bwid = 0;
-  lines.forEach(function(l){ bwid = Math.max(bwid, g.measureText(l).width); }); bwid += 22;
-  var by = hgt * 0.5 + 8; rr(g, -bwid / 2, by, bwid, bh, 12); g.fillStyle = RED; g.fill(); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; lines.forEach(function(l, i){ g.fillText(l, 0, by + 5 + lh * (i + 0.5)); });
-  g.restore();
-}
-function wrap2(g, txt, maxW){
-  var w = txt.split(' '), out = [], cur = '';
-  w.forEach(function(x){ var t = cur ? cur + ' ' + x : x; if (g.measureText(t).width > maxW && cur){ out.push(cur); cur = x; } else cur = t; });
-  if (cur) out.push(cur); return out;
-}
-function render(t, dt){
-  var g = ctx;
-  g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  g.fillStyle = INK; g.fillRect(0, 0, W, H);
-  g.save();
-  if (shakeT > 0 && !photoMode) g.translate(rnd(-5, 5), rnd(-5, 5));
-  if (DEMO){
-    var bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2b6f73'); bg.addColorStop(1, '#173a3c');
-    g.fillStyle = bg; g.fillRect(-10, -10, W + 20, H + 20);
-    if (P.alpha > 0.01){ g.globalAlpha = P.alpha; drawDemoFace(); g.globalAlpha = 1; }
-  } else if (video.readyState >= 2){
-    updateVM();
-    g.save(); g.translate(W, 0); g.scale(-1, 1); g.drawImage(video, vm.ox, vm.oy, vm.dw, vm.dh); g.restore();
-  }
-  if (outfit === 'B' && !REDUCED){ g.fillStyle = 'rgba(255,255,255,.85)'; for (var m = 0; m < snowB.length; m++){ var fl = snowB[m]; g.beginPath(); g.arc(fl.x, fl.y, fl.r, 0, TAU); g.fill(); } }
-  drawMask(t);
-  // ингредиенты
-  var is = 0;
-  for (var j = 0; j < items.length; j++){
-    var b = items[j]; is = b.r * 2.9;
-    g.save(); g.translate(b.x, b.y); g.rotate(b.rot); g.drawImage(SPR[b.k], -is / 2, -is / 2, is, is); g.restore();
-  }
-  drawParts();
-  if (outfit === 'B' && !REDUCED){
-    g.lineCap = 'round';
-    for (var q = 0; q < snowF.length; q++){
-      var f = snowF[q]; g.save(); g.translate(f.x, f.y); g.rotate(f.rot);
-      g.strokeStyle = INK; g.lineWidth = 4.4; g.beginPath(); for (var a = 0; a < 3; a++){ var an = a * Math.PI / 3; g.moveTo(Math.cos(an) * f.r, Math.sin(an) * f.r); g.lineTo(-Math.cos(an) * f.r, -Math.sin(an) * f.r); } g.stroke();
-      g.strokeStyle = '#fff'; g.lineWidth = 2.2; g.stroke(); g.restore();
-    }
-  }
-  // маскот в углу
-  var ms = clamp(W * 0.23, 66, 96), tgt = (state === 'round' || state === 'countdown') ? H - SAFEB - 22 : H - SAFEB - 128;
-  masY = masY ? lerp(masY, tgt, Math.min(1, dt * 6)) : tgt;
-  if (doneCup && P.alpha > 0.05) drawDoneCup(g);
-  if (!photoMode){
-    drawMascot(g, 10 + ms / 2, masY, ms, outfit === 'B', mas.sad > 0, mas.jump, mas.big, t);
-    drawLogo(g, W / 2, SAFET + 30, clamp(W * 0.34, 112, 150), -0.03);
-  }
-  if (flashT > 0 && !photoMode){ g.fillStyle = 'rgba(220,34,60,' + clamp(flashT * 0.8, 0, 0.3) + ')'; g.fillRect(-10, -10, W + 20, H + 20); }
-  g.restore();
-}
-
-function enterMask(){
-  gameActive = true; paused = false; firstFace = true; P.ex = W / 2; P.ey = H / 2; P.alpha = 0; P.has = false; T.has = false; hk.init = false;
-  hideScreens(); toIdle(); lastT = performance.now(); updateDots();
-}
 
 /* ---------- Фото 9:16 ---------- */
 function rrp(c, x, y, w, h, r){ c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
@@ -1292,61 +1210,96 @@ function makePhoto(){
   g.fillStyle = CREAM; g.fillRect(0, 0, OW, OH);
   photoMode = true; try { render(clock, 0); } finally { photoMode = false; }
   var cw = canvas.width, ch = canvas.height, sc = Math.max(OW / cw, OH / ch), sw = OW / sc, sh = OH / sc;
-  var topY = P.alpha > 0.1 ? (P.ey - (outfit === 'A' ? 2.25 : 1.55) * P.s - 0.03 * H) * DPR : (ch - sh) / 2;
+  var topY = (P.alpha > 0.1 && state === 'idle' && ext < 9000) ? (ext - 0.04 * H) * DPR : (ch - sh) / 2;
   var sx = clamp((cw - sw) / 2, 0, Math.max(0, cw - sw)), sy = clamp(topY, 0, Math.max(0, ch - sh));
   try { g.imageSmoothingQuality = 'high'; } catch (e) {}
   g.drawImage(canvas, sx, sy, sw, sh, 0, 0, OW, OH);
-  // рамка
   g.beginPath(); g.rect(0, 0, OW, OH); rrp(g, M, M, OW - 2 * M, OH - 2 * M, 52); g.fillStyle = CREAM; g.fill('evenodd');
   g.lineJoin = 'round'; g.beginPath(); rrp(g, M, M, OW - 2 * M, OH - 2 * M, 52); g.lineWidth = 8; g.strokeStyle = INK; g.stroke();
   g.beginPath(); rrp(g, 6, 6, OW - 12, OH - 12, 64); g.lineWidth = 6; g.strokeStyle = RED; g.stroke();
-  // плашка
   var px = M + 16, pw = OW - 2 * (M + 16), py = OH - M - 16 - PH;
   g.beginPath(); rrp(g, px, py, pw, PH, 48); g.fillStyle = TEAL; g.fill(); g.lineWidth = 8; g.strokeStyle = INK; g.stroke();
   g.fillStyle = 'rgba(255,255,255,.14)'; g.beginPath(); rrp(g, px + 22, py + 16, pw * 0.5, 16, 8); g.fill();
-  var hasScore = lastScore !== null;
-  drawLogo(g, px + 250, py + 118, 400, -0.04);
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
-  var sub = team !== 'WEDRINK' ? team : 'Настоящий азиатский чай';
-  fitFont(g, sub, 410, 38, 800); g.fillText(sub, px + 250, py + 238);
-  if (hasScore){
-    var cx = px + 580;
+  // логотип
+  var lx = px + 120, ly = py + 120;
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(lx, ly, 86, 0, TAU); g.fill(); if (IM.logo) g.drawImage(IM.logo, lx - 78, ly - 78, 156, 156);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; fitFont(g, 'WEDRINK', 230, 50, 900); g.lineWidth = 8; g.strokeStyle = INK; g.lineJoin = 'round'; g.strokeText('WEDRINK', lx, py + 262); g.fillText('WEDRINK', lx, py + 262);
+  var cx = px + 540;
+  if (lastScore !== null && photoKind === 'game'){
     fitFont(g, 'СЧЁТ', 200, 32, 800); g.fillStyle = '#CFF1EE'; g.fillText('СЧЁТ', cx, py + 70);
-    fitFont(g, String(lastScore), 210, 128, 900); g.lineWidth = 12; g.strokeStyle = INK; g.strokeText(String(lastScore), cx, py + 160); g.fillStyle = '#fff'; g.fillText(String(lastScore), cx, py + 160);
-    fitFont(g, 'Напитков: ' + lastDrinks, 210, 32, 800); g.fillStyle = '#fff'; g.fillText('Напитков: ' + lastDrinks, cx, py + 250);
+    fitFont(g, String(lastScore), 330, 140, 900); g.lineWidth = 12; g.strokeStyle = INK; g.strokeText(String(lastScore), cx, py + 170); g.fillStyle = '#fff'; g.fillText(String(lastScore), cx, py + 170);
+    fitFont(g, 'Ловил ртом ингредиенты', 380, 30, 800); g.fillStyle = '#fff'; g.fillText('Ловил ртом ингредиенты', cx, py + 262);
+  } else if (outfit === 'A' && rl.st === 'show'){
+    var d = DRINKS[rl.idx]; g.fillStyle = '#CFF1EE'; fitFont(g, 'МОЙ НАПИТОК', 380, 32, 800); g.fillText('МОЙ НАПИТОК', cx, py + 62);
+    g.fillStyle = '#fff'; g.font = '900 42px ' + FONT; var nl = wrapText(g, d.n, 330).slice(0, 3), lh = 50, y0 = py + 170 - (nl.length - 1) * lh / 2 + 10;
+    nl.forEach(function(l, i){ g.lineWidth = 8; g.strokeStyle = INK; g.strokeText(l, cx, y0 + i * lh); g.fillText(l, cx, y0 + i * lh); });
+  } else {
+    g.fillStyle = '#fff'; fitFont(g, 'Настоящий азиатский чай', 400, 40, 800); var sub = team !== 'WEDRINK' ? team : 'Настоящий азиатский чай'; g.fillText(sub, cx, py + 170);
   }
-  if (mascotOK){ var mz = 320; g.drawImage(mascot, px + pw - mz + 24, py + PH - mz - 4, mz, mz); }
+  if (IM.m_ura){ var mz = 250, mh = mz * asp('m_ura'); g.drawImage(IM.m_ura, px + pw - mz + 14, py + PH - mh - 8, mz, mh); }
   return c;
 }
+var photoKind = 'photo';
 function savePhoto(){
+  if (photoBlob && $('sheet').classList.contains('photo')){ deliver(photoBlob); return; }
   var pc; try { pc = makePhoto(); } catch (e) { toast('Не получилось сделать фото'); return; }
-  var fl = document.createElement('div'); fl.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:.8;z-index:20;pointer-events:none;transition:opacity .35s'; $('app').appendChild(fl);
-  requestAnimationFrame(function(){ fl.style.opacity = 0; setTimeout(function(){ fl.remove(); }, 400); });
-  try {
-    pc.toBlob(function(blob){
-      if (!blob){ toast('Не получилось сохранить фото'); return; }
-      var file = null; try { file = new File([blob], 'wedrink-maska.jpg', { type: 'image/jpeg' }); } catch (e) {}
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })){
-        navigator.share({ files: [file], title: 'Маска WeDrink' }).catch(function(e){ if (!e || e.name !== 'AbortError') download(blob); });
-      } else download(blob);
-    }, 'image/jpeg', 0.92);
-  } catch (e) { toast('Не получилось сохранить фото'); }
+  pc.toBlob(function(blob){ if (!blob){ toast('Не получилось сохранить фото'); return; } deliver(blob); }, 'image/jpeg', 0.92);
+}
+function deliver(blob){
+  var file = null; try { file = new File([blob], 'wedrink-maska.jpg', { type: 'image/jpeg' }); } catch (e) {}
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file], title: 'Маска WeDrink' }).catch(function(e){ if (!e || e.name !== 'AbortError') download(blob); });
+  } else download(blob);
 }
 function download(blob){
   var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = 'wedrink-maska.jpg';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(u); }, 4000);
   toast('Фото сохранено');
 }
+function openPhoto(){
+  if (state !== 'idle') return;
+  var pc; try { photoKind = 'photo'; pc = makePhoto(); } catch (e) { toast('Не получилось сделать фото'); return; }
+  var fl = document.createElement('div'); fl.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:.8;z-index:20;pointer-events:none;transition:opacity .35s'; $('app').appendChild(fl);
+  requestAnimationFrame(function(){ fl.style.opacity = 0; setTimeout(function(){ fl.remove(); }, 400); });
+  SFX.pop();
+  pc.toBlob(function(blob){
+    if (!blob){ toast('Не получилось сделать фото'); return; }
+    photoBlob = blob; if (photoURL) URL.revokeObjectURL(photoURL); photoURL = URL.createObjectURL(blob);
+    $('pvImg').src = photoURL;
+    var d = (outfit === 'A' && rl.st === 'show') ? DRINKS[rl.idx].n : 'Твой кадр';
+    $('rTitle').textContent = d; $('sheet').classList.add('photo'); $('sheet').classList.add('on');
+  }, 'image/jpeg', 0.9);
+}
+
+/* ---------- Позвать друга ---------- */
+function shareFriend(){
+  var url = pageLink(), text;
+  if (lastScore !== null && state === 'result') text = 'Я набрал(а) ' + lastScore + ' в маске WeDrink — побей';
+  else if (outfit === 'A' && rl.st === 'show') text = 'Мой напиток в маске WeDrink: ' + DRINKS[rl.idx].n + '. А твой?';
+  else text = 'Попробуй маску WeDrink';
+  function copy(){
+    var done = function(){ toast('Ссылка скопирована'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text + ' ' + url).then(done, function(){ toast(url); }); else toast(url);
+  }
+  if (navigator.share){ navigator.share({ title: 'Маска WeDrink', text: text, url: url }).catch(function(e){ if (!e || e.name !== 'AbortError') copy(); }); }
+  else copy();
+}
 
 /* ---------- Кнопки и события ---------- */
 $('bStart').addEventListener('click', begin);
 $('bRetry').addEventListener('click', begin);
 $('bPlay').addEventListener('click', startRound);
-$('bPhoto').addEventListener('click', savePhoto);
+$('bPhoto').addEventListener('click', openPhoto);
+$('bFriend').addEventListener('click', shareFriend);
+$('bShare').addEventListener('click', shareFriend);
 $('bSave').addEventListener('click', savePhoto);
-$('bAgain').addEventListener('click', startRound);
+$('bAgain').addEventListener('click', function(){
+  if ($('sheet').classList.contains('photo')){ closeSheet(); if (outfit === 'A' && state === 'idle') rlSpin(); } else startRound();
+});
+$('bBack').addEventListener('click', function(){ if (state === 'result') toIdle(); else closeSheet(); });
+$('snd').addEventListener('click', function(){ audioInit(); setMuted(!muted); });
 $('bResume').addEventListener('click', function(){ paused = false; hideScreens(); if (!DEMO) video.play().catch(function(){}); lastT = performance.now(); });
-Array.prototype.forEach.call(document.querySelectorAll('.dot'), function(d){ d.addEventListener('click', function(){ setOutfit(d.getAttribute('data-o')); }); });
+Array.prototype.forEach.call(document.querySelectorAll('.dot'), function(d){ d.addEventListener('click', function(){ audioInit(); setOutfit(d.getAttribute('data-o')); }); });
 (function(){
   var app = $('app'), p0 = null;
   app.addEventListener('pointerdown', function(e){
@@ -1354,14 +1307,13 @@ Array.prototype.forEach.call(document.querySelectorAll('.dot'), function(d){ d.a
     p0 = { x: e.clientX, y: e.clientY, t: performance.now() };
   });
   app.addEventListener('pointerup', function(e){
-    if (!p0) return; var dx = e.clientX - p0.x, dy = e.clientY - p0.y, el = performance.now() - p0.t; p0 = null;
-    if (!gameActive || paused || state === 'countdown' || state === 'round') return;
+    if (!p0) return; var dx = e.clientX - p0.x, dy = e.clientY - p0.y; p0 = null;
+    if (!gameActive || paused || state !== 'idle') return;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) nextOutfit(dx < 0 ? 1 : -1);
-    else if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && el < 400 && outfit === 'A' && state === 'idle') cycleDrink();
   });
   app.addEventListener('pointercancel', function(){ p0 = null; });
 })();
-document.addEventListener('keydown', function(e){ if (!gameActive || state === 'round' || state === 'countdown') return; if (e.key === 'ArrowLeft') nextOutfit(-1); else if (e.key === 'ArrowRight') nextOutfit(1); });
+document.addEventListener('keydown', function(e){ if (!gameActive || state !== 'idle') return; if (e.key === 'ArrowLeft') nextOutfit(-1); else if (e.key === 'ArrowRight') nextOutfit(1); });
 document.addEventListener('visibilitychange', function(){
   if (document.hidden){
     if (gameActive && (state === 'countdown' || state === 'round')){ paused = true; showScreen('pause'); }
@@ -1373,8 +1325,12 @@ document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
 try { if (window.Telegram && Telegram.WebApp){ Telegram.WebApp.ready(); Telegram.WebApp.expand(); } } catch (e) {}
 
+$('snd').classList.toggle('off', muted);
 updateDots();
-if (DEMO) $('bStart').textContent = 'Демо без камеры';
+if (DEMO){
+  $('bStart').textContent = 'Демо без камеры';
+  window.__wd = { set: function(o){ setOutfit(o); }, play: startRound, rl: rl, rlStop: rlStop, rlSpin: rlSpin, cup: cup, st: function(){ return state; }, ent: function(){ return entT; }, P: P, win: win, splash: splash, jump: function(sec){ var n = Math.round(sec / STEP); for (var i = 0; i < n; i++) step(STEP); } };
+}
 requestAnimationFrame(frame);
 })();
 </script>
