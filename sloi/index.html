@@ -2297,16 +2297,20 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
 var CAPN = 4;                                    // слоёв в стакане
 var NTYPES = 10;                                 // видов слоя (позиции меню); рисуются в игре
 var TCONF = [[4, 6], [4, 7], [1, 8], [0, 9], [5, 8]];   // виды, близкие по цвету: на одну доску не кладём
-// Сложность дня: cols — сколько цветов на 1-й, 2-й… доске раунда (дальше — последнее число); два пустых стакана всегда.
-// K и max: сколько раздач проверяем и берём ли самую трудную (max) или самую лёгкую по числу ходов решателя.
+// Сложность дня: cols — сколько цветов на 1-й, 2-й… доске раунда; длина списка = число досок раунда B (собрал все — раунд кончается раньше 60 с);
+// два пустых стакана всегда. K и max: сколько раздач проверяем и берём ли самую трудную (max) или самую лёгкую по числу ходов решателя.
+// EP — степень штрафа за лишние ходы.
 var LVL = [null,
-  { cols: [3, 4], K: 2, max: false },
-  { cols: [3, 4, 5], K: 1, max: false },
-  { cols: [3, 5, 6], K: 3, max: true }];
-// Счёт. Доска даёт opt · e, где opt — число ходов решателя (минимум), e = min(1, opt / ходов игрока) (× HELP, если брали стакан-помощник).
+  { cols: [3, 4, 4, 4, 4], K: 2, max: false, EP: 2 },
+  { cols: [3, 4, 5, 5], K: 1, max: false, EP: 2 },
+  { cols: [3, 5, 6, 6], K: 3, max: true, EP: 3 }];
+// Счёт. Доска даёт opt · e^EP, где opt — число ходов решателя (минимум), e = min(1, opt / ходов игрока) (× HELP, если брали стакан-помощник).
 // Недоконченная к концу времени доска даёт PART · opt · (доля закрытых стаканов). Очки идут только за доски — ни за ход, ни за перелив туда-сюда.
-// Сумма делится на TARGET[уровень] → x от 0 до 1. Выше KNEE счёт = 300·x (прямая шкала), ниже — 300·KNEE·(x/KNEE)^GAMMA (новичку первые очки даются щедрее).
-var SC = { PART: 0.4, HELP: 0.8, KNEE: 0.85, GAMMA: 0.5, TRANS: 1.5, ROUND: 60, TARGET: [0, 80.5, 84, 87.5] };
+// R = сумма / PARSUM[уровень], где PARSUM — «типичный» объём ходов первых B досок (PAR — средний opt доски с таким числом цветов, замер симуляцией
+//   по 10 000 раундов). Так счёт сравнивает игрока с типичной раздачей: более трудные доски дают больший потолок, лёгкие — меньший.
+// x = clamp(R / TARGET[уровень], 0, 1). Выше KNEE счёт = 300·x (прямая шкала), ниже — 300·KNEE·(x/KNEE)^GAMMA (новичку первые очки даются щедрее).
+var SC = { PART: 0.4, HELP: 0.8, KNEE: 0.7, GAMMA: 0.5, TRANS: 1.5, ROUND: 60, TARGET: [0, 1.107, 1.134, 1.083],
+  PAR: [null, { 3: 7.952, 4: 10.483 }, { 3: 7.96, 4: 11.32, 5: 14.616 }, { 3: 7.949, 5: 15.857, 6: 19.149 }] };
 
 function topRun(c) {
   var n = c.length, k = 1;
@@ -2537,13 +2541,19 @@ function featuredTypes(d) {
   return out;
 }
 // Очки
-function boardValue(opt, moves, helped) {
+function boardsOf(level) { return LVL[level].cols.length; }
+function parSum(level) {
+  var c = LVL[level].cols, i, t = 0;
+  for (i = 0; i < c.length; i++) t += SC.PAR[level][c[i]];
+  return t;
+}
+function boardValue(level, opt, moves, helped) {
   var e = Math.min(1, opt / Math.max(moves, 1));
-  return opt * e * (helped ? SC.HELP : 1);
+  return opt * Math.pow(e, LVL[level].EP) * (helped ? SC.HELP : 1);
 }
 function partValue(opt, sealed, n) { return SC.PART * opt * sealed / n; }
 function toScore(sum, level) {
-  var x = clamp(sum / SC.TARGET[level], 0, 1);
+  var x = clamp(sum / parSum(level) / SC.TARGET[level], 0, 1);
   return Math.round(300 * (x >= SC.KNEE ? x : SC.KNEE * Math.pow(x / SC.KNEE, SC.GAMMA)));
 }
 /*</LOGIC>*/
@@ -2816,7 +2826,7 @@ GAME.draw = function () {
   c.textBaseline = 'middle'; c.textAlign = 'left'; c.font = '900 16px ' + FONT;
   c.beginPath(); c.moveTo(14, 15); c.lineTo(28, 15); c.lineTo(25.5, 29); c.lineTo(16.5, 29); c.closePath(); c.fillStyle = rgba(css.brand, 0.9); c.fill();
   c.fillStyle = G.moves > G.bd.opt ? (WINTER ? '#FF8494' : css.accent) : ink; c.fillText(G.moves + ' / ' + G.bd.opt, 36, 22);
-  c.textAlign = 'right'; c.fillStyle = ink; c.fillText(String(G.done), W - 38, 22);
+  c.textAlign = 'right'; c.fillStyle = ink; c.fillText(G.done + '/' + boardsOf(G.level), W - 38, 22);
   rrect(c, W - 32, 12, 18, 20, 5); c.strokeStyle = WINTER ? '#E8F7F9' : css.brandDark; c.lineWidth = 2; c.stroke();
   rrect(c, W - 32, 12, 18, 6, 3); c.fillStyle = css.brand; c.fill();
   e = G.state === 'out' ? easeOut(G.exitT / 0.3) : 0;
@@ -2877,8 +2887,8 @@ GAME.dayCatch = function (d) {
   return 'Слои дня: <b>' + s.join('</b>, <b>') + '</b>';
 };
 GAME.previewRows = function (score) {
-  var n = Math.max(1, Math.round(score / 30));
-  return rowsOf([['Досок', n], ['Идеальных', Math.max(0, n - 2)], ['Лишних ходов', Math.round((300 - score) / 25)]]);
+  var n = Math.max(1, Math.min(5, Math.round(score / 60)));
+  return rowsOf([['Досок', n + '/5'], ['Идеальных', Math.max(0, n - 1)], ['Лишних ходов', Math.round((300 - score) / 40)]]);
 };
 GAME.active = function () { return !!G; };
 GAME.layout = function () {
@@ -2913,7 +2923,7 @@ GAME.heroFrame = function (dt) {                 // стартовый экра�
     seed = seedFor(dateIntOf(dateKey(now)), day.used + 1);   // тот же seed, что выдаст beginAttempt
     if (!PRE || PRE.seed !== seed) {
       d = DRINKS[now.getDay()] || DRINKS[1]; PRE = newPf(seed, d.level, featuredTypes(d));
-      queueBoard(PRE, 0); queueBoard(PRE, 1); queueBoard(PRE, 2);
+      queueBoard(PRE, 0); queueBoard(PRE, 1); queueBoard(PRE, 2);   // каждая сложность — минимум 4 доски
     }
     workSlice(PRE, 4);
   } catch (e) { /* заготовка не критична: доски посчитаются в игре */ }
@@ -2957,7 +2967,7 @@ function checkStuck() {                          // ходов нет — сра
   G.pf.work.unshift({ job: solveJob(G.st, 12000), ok: function () { return G.mst === st && !G.won; }, done: function (r) { if (r && r.len < 0) addHelper(); } });
 }
 function win() {
-  var v = boardValue(G.bd.opt, G.moves, G.helped), old = toScore(G.sum, G.level);
+  var v = boardValue(G.level, G.bd.opt, G.moves, G.helped), old = toScore(G.sum, G.level);
   G.won = true; G.state = 'won'; G.winT = 0; G.sel = -1; G.hint = null;
   G.sum += v; G.done++;
   if (G.moves === G.bd.opt && !G.helped) G.perfect++;
@@ -2968,7 +2978,7 @@ function endRound(timeout) {
   if (G.state === 'end') return;
   if (!G.won) G.sum += partValue(G.bd.opt, sealedCount(G.st), G.bd.n);
   G.final = toScore(G.sum, G.level); G.hudTarget = G.final; G.state = 'end'; G.endT = 0; G.sel = -1; G.hint = null;
-  if (timeout) { caption('Время!', 1200); Sfx.play('end'); }
+  if (timeout) { caption('Время!', 1200); Sfx.play('end'); } else { caption('Все доски!', 1200); Sfx.play('win'); }
 }
 function illegal(a, b) {
   var A = G.cv[a], B = G.cv[b];
@@ -3083,7 +3093,8 @@ GAME.update = function (now, dt) {
   }
   Mascot.step(dt); pStep(dt); if (snow) stepSnow(snow, dt);
   if (G.state !== 'end') {                       // две ближайшие доски — вперёд; ждём новую доску — её задание первым
-    queueBoard(G.pf, G.k + 1); queueBoard(G.pf, G.k + 2);
+    if (G.k + 1 < boardsOf(G.level)) queueBoard(G.pf, G.k + 1);
+    if (G.k + 2 < boardsOf(G.level)) queueBoard(G.pf, G.k + 2);
     if (G.state !== 'play' && !G.pf.rdy[G.k + 1]) for (i = 0; i < G.pf.work.length; i++) if (G.pf.work[i].board === G.k + 1) { G.pf.work.unshift(G.pf.work.splice(i, 1)[0]); break; }
     workSlice(G.pf, WORK_MS);
     if (!G.pf.work.length && G.warm.length && FR) warmField(G.warm.shift());   // ничего не считаем — рисуем фон будущей доски (один за кадр)
@@ -3145,12 +3156,12 @@ GAME.update = function (now, dt) {
     if (G.winT > 1.15 && !G.anims.length) { G.state = 'out'; G.exitT = 0; }
   } else if (G.state === 'out') {
     G.exitT += dt;
-    if (G.exitT >= 0.3) { if (G.t >= SC.ROUND) endRound(true); else if (G.pf.rdy[G.k + 1]) startBoard(G.k + 1); }   // не готова — ждём, не считая на месте
+    if (G.exitT >= 0.3) { if (G.done >= boardsOf(G.level)) endRound(false); else if (G.t >= SC.ROUND) endRound(true); else if (G.pf.rdy[G.k + 1]) startBoard(G.k + 1); }   // не готова — ждём, не считая на месте
   } else if (G.state === 'end') {
     G.endT += dt;
     if (G.endT >= END_PAUSE_MS / 1000) {
       d = G; G = null;
-      endAttempt(d.s, d.final, rowsOf([['Досок', d.done], ['Идеальных', d.perfect], ['Лишних ходов', d.extra]]));
+      endAttempt(d.s, d.final, rowsOf([['Досок', d.done + '/' + boardsOf(d.level)], ['Идеальных', d.perfect], ['Лишних ходов', d.extra]]));
       return false;
     }
   }

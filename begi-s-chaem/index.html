@@ -2301,8 +2301,8 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   // g0/g1 — пауза между «узорами», A — время прыжка, hwU/hwS/hwW — полуширина окна лужи/ящика/фонариков (с),
   // pFill/pGate — доля узоров с лишними препятствиями рядом, pAir — доля шариков в воздухе, pIng — шанс ингредиента, kap — доля от идеала для 300.
   var LV = {
-    1: { L0: 2.0, L1: 1.8, g0: 1.7, g1: 1.4, A: 0.70, hwU: 0.27, hwS: 0.12, hwW: 0.10, pFill: 0.15, pGate: 0.2, pAir: 0.8, arcN: 5, arcSt: 0.108, snN: 8, snSt: 0.20, pIng: 0.55, pIngAir: 0.2, wire: false, gs: 1.1, gc: 1.0, gd: 0.9, p3: 0,
-         wt: [['jump', 3], ['dodge', 3], ['slalom', 1.5], ['combo', 1.5], ['drift', 0], ['dbl', 0], ['rest', 0.5], ['snake', 2.5]], kap: 1.01 },
+    1: { L0: 2.0, L1: 1.8, g0: 1.7, g1: 1.4, A: 0.70, hwU: 0.24, hwS: 0.12, hwW: 0.10, pFill: 0.15, pGate: 0.2, pAir: 0.8, arcN: 5, arcSt: 0.086, snN: 8, snSt: 0.20, pIng: 0.55, pIngAir: 0.2, wire: false, gs: 1.1, gc: 1.0, gd: 0.9, p3: 0,
+         wt: [['jump', 3], ['dodge', 3], ['slalom', 1.5], ['combo', 1.5], ['drift', 0], ['dbl', 0], ['rest', 0.5], ['snake', 2.5]], kap: 1 },
     2: { L0: 1.8, L1: 1.55, g0: 1.5, g1: 1.15, A: 0.65, hwU: 0.22, hwS: 0.11, hwW: 0.10, pFill: 0.3, pGate: 0.4, pAir: 0.8, arcN: 5, arcSt: 0.094, snN: 7, snSt: 0.22, pIng: 0.55, pIngAir: 0.3, wire: true, gs: 0.95, gc: 0.9, gd: 0.85, p3: 0.3,
          wt: [['jump', 2.5], ['dodge', 3], ['slalom', 2], ['combo', 1.5], ['drift', 1], ['dbl', 0.5], ['rest', 1], ['snake', 2]], kap: 1 },
     3: { L0: 1.6, L1: 1.35, g0: 1.35, g1: 1.0, A: 0.60, hwU: 0.21, hwS: 0.12, hwW: 0.10, pFill: 0.4, pGate: 0.6, pAir: 0.8, arcN: 5, arcSt: 0.086, snN: 8, snSt: 0.2, pIng: 0.55, pIngAir: 0.4, wire: true, gs: 0.82, gc: 0.8, gd: 0.78, p3: 0.5,
@@ -2327,7 +2327,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
         add(t, l, 'u');
         if (!tut && r() < P.pFill) add(t, (l + 1 + rr(2)) % 3, 's');
         if (tut || r() < P.pAir) {
-          if (!tut && r() < P.pIngAir) { pearls(t - 0.2, l, 2, 0.1, true); ing(t, l, true); pearls(t + 0.1, l, 2, 0.1, true); for (q = 1; q <= 5; q++) if (objs[objs.length - q].k === 'p') objs[objs.length - q].v = 3; } else arc(t, l);
+          if (!tut && r() < P.pIngAir) { pearls(t - 2 * P.arcSt, l, 2, P.arcSt, true); ing(t, l, true); pearls(t + P.arcSt, l, 2, P.arcSt, true); for (q = 1; q <= 5; q++) if (objs[objs.length - q].k === 'p') objs[objs.length - q].v = 3; } else arc(t, l);
         }
         pearls(t + 0.6, l, 3, 0.1);
         e = t + 0.8;
@@ -2400,7 +2400,8 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     }
     pearls(last + 0.3, lane, Math.max(0, Math.floor((DUR - 0.8 - (last + 0.3)) / 0.12)), 0.12);
     objs.sort(function (a, b) { return (a.t - b.t) || (a.l - b.l); });
-    return { objs: objs, lv: lv, seed: seed };
+    for (i = 0, w = 0; i < objs.length; i++) w += objs[i].k === 'i' ? ING_PTS : (objs[i].k === 'p' ? PEARL_PTS : 0);
+    return { objs: objs, lv: lv, seed: seed, total: w };      // total — сумма всех предметов расписания
   }
 
   // Планировщик: точный разбор «как пройти лучше всего» по тактам 0,05 с. Состояние — дорожка (или переход между двумя, 3 такта,
@@ -2510,12 +2511,17 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     return sc;
   }
 
+  // Расписание принимается, только если планировщик собирает В НИХ ВСЁ: идеал = сумма всех предметов = цель счёта. Тогда 300 очков —
+  // это «собрал всё без ударов», и такой путь точно есть. Не вышло — пробуем следующий вариант того же seed (детерминированно, до 5 раз),
+  // шестой — запасной «спокойный» набор узоров.
+  function genAttempt(seed, lv, tries) { return genTry((seed ^ (tries * 0x3C6EF372)) | 0, lv, tries >= 5); }
+  function schedAccept(sc, pl) { return pl.ok && Math.round(pl.val) === sc.total; }
   function genSchedule(seed, lv) {
     var tries, sc, pl;
     for (tries = 0; tries < 6; tries++) {
-      sc = genTry((seed ^ (tries * 0x3C6EF372)) | 0, lv, tries >= 5);
+      sc = genAttempt(seed, lv, tries);
       pl = planDP(sc, 0, 0, 1, 0);
-      if (pl.ok) break;
+      if (schedAccept(sc, pl)) break;
     }
     return schedFinish(sc, pl);
   }
@@ -2884,20 +2890,27 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     if (attemptsLeft(day) === 0) return null;
     return { seed: seedFor(dateIntOf(dateKey(now)), day.used + 1), lv: (DRINKS[now.getDay()] || DRINKS[1]).level };
   }
-  function preFinish(job) {                         // дорасчитать синхронно; false — планировщик не нашёл путь (запасной полный расчёт)
+  function preFinish(job) {                         // дорасчитать синхронно, как genSchedule (те же попытки подряд)
     var pl;
-    dpRun(job.D, 0, null);
-    pl = dpPlan(job.D, 0, 1, 0);
-    if (pl.ok) schedFinish(job.sc, pl); else job.sc = genSchedule(job.seed, job.lv);
+    for (;;) {
+      dpRun(job.D, 0, null); pl = dpPlan(job.D, 0, 1, 0);
+      if (schedAccept(job.sc, pl) || job.tries >= 5) { schedFinish(job.sc, pl); break; }
+      job.tries++; job.sc = genAttempt(job.seed, job.lv, job.tries); job.D = dpInit(job.sc, 0, true);
+    }
     job.D = null; job.done = true;
   }
   function preStep() {
-    var k = preKey(), sc;
+    var k = preKey(), pl;
     try {
       if (!k) { PRE = null; return; }
-      if (!PRE || PRE.seed !== k.seed || PRE.lv !== k.lv) { sc = genTry((k.seed ^ 0) | 0, k.lv, false); PRE = { seed: k.seed, lv: k.lv, sc: sc, D: dpInit(sc, 0, true), done: false }; }
+      if (!PRE || PRE.seed !== k.seed || PRE.lv !== k.lv) { PRE = { seed: k.seed, lv: k.lv, tries: 0, sc: genAttempt(k.seed, k.lv, 0), D: null, done: false }; PRE.D = dpInit(PRE.sc, 0, true); }
       if (PRE.done) return;
-      if (dpRun(PRE.D, 4, nowMs)) preFinish(PRE); else preTimer = setTimeout(preStep, 8);
+      if (dpRun(PRE.D, 4, nowMs)) {
+        pl = dpPlan(PRE.D, 0, 1, 0);
+        if (schedAccept(PRE.sc, pl) || PRE.tries >= 5) { schedFinish(PRE.sc, pl); PRE.D = null; PRE.done = true; return; }
+        PRE.tries++; PRE.sc = genAttempt(PRE.seed, PRE.lv, PRE.tries); PRE.D = dpInit(PRE.sc, 0, true);
+      }
+      preTimer = setTimeout(preStep, 8);
     } catch (e) { PRE = null; }
   }
   function prefetch(delay) { clearTimeout(preTimer); preTimer = setTimeout(preStep, delay); }
