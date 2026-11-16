@@ -1268,7 +1268,7 @@ body > .wdx-ibtn{position:absolute}
     release: function () { if (cfg.shell) shellPost('release'); else { holdMode = false; if (pref('music')) play(); } },
     setBack: setBack,
     shellAttach: function (win, onClose) { shellWin = win; shellClose = onClose; },
-    shellDetach: function () { shellWin = null; shellClose = null; },
+    shellDetach: function () { shellWin = null; shellClose = null; if (holdMode) { holdMode = false; if (pref('music')) play(); } },     // игру закрыли посреди раунда — музыка возвращается
     inShell: function () { return cfg.shell; },
     _dbg: function () { return { idx: idx, title: curTitle(), paused: audio ? audio.paused : null, t: audio ? audio.currentTime : null, started: started, hold: holdMode, shell: cfg.shell }; }
   };
