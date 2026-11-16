@@ -111,6 +111,7 @@ body.winter .card{box-shadow:0 10px 26px rgba(0,0,0,.34),inset 0 0 0 1px rgba(27
 .card:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .card canvas{flex:none;width:84px;height:84px;display:block;border-radius:16px;background:linear-gradient(180deg,var(--soft),var(--soft-2))}
 .card .tx{flex:1;min-width:0}
+.card .new{display:inline-block;margin-left:7px;padding:3px 8px 2px;border-radius:999px;background:var(--accent);color:#fff;font-size:11px;line-height:1;font-weight:900;letter-spacing:.08em;text-transform:uppercase;vertical-align:middle;position:relative;top:-2px}
 .card h2{font-size:21px;line-height:1.1;font-weight:900;letter-spacing:-.02em;color:var(--brand-dark)}
 .card p{margin-top:5px;font-size:14px;line-height:1.3;color:var(--muted)}
 .card .left{margin-top:8px;display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;background:var(--soft);color:var(--brand-dark)}
@@ -924,14 +925,23 @@ var DRINKS = [
 ];
 var DAY_LABELS = { 1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 0: 'Вс' };
 var DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+var NEW_UNTIL = '2026-12-01';  // запасная дата окончания метки «Новая» (если у игры нет своей newUntil)
+/* Выпуск новых игр по одной в неделю (решение Р-1163): у каждой новой игры visible: false — карточка скрыта.
+   Чтобы выпустить игру: поставить visible: true и newUntil: 'ГГГГ-ММ-ДД' (дата выпуска + 14 дней, метка «Новая» до этой даты, не включая).
+   Для проверки скрытых игр: открыть зал с ?show=all (ничего не сохраняется). Игры друг от друга не зависят. */  // пометка «Новая» на карточках новых игр показывается до этой даты (не включая): запуск 17.11.2026 + две недели
 
 var GAMES = [
+  { slug: 'sliyanie', title: 'Слияние', line: 'Бросай ингредиенты в стакан: одинаковые сливаются в новый.', art: 'merge', isNew: true, visible: false, newUntil: '' },
+  { slug: 'bit', title: 'Бит', line: 'Тапай по линиям в такт музыке WeDrink.', art: 'beat', isNew: true, visible: false, newUntil: '' },
   { slug: 'naley-do-cherty', title: 'Налей до черты', line: 'Держи — льётся, отпусти — стоп. Три слоя, три черты.', art: 'pour' },
   { slug: 'lovi-tapioku', title: 'Лови тапиоку', line: 'Води стакан и лови шарики тапиоки.', art: 'catch' },
   { slug: 'soberi-zakaz', title: 'Собери заказ', line: 'Запомни чек и собери стакан по порядку.', art: 'order' },
   { slug: 'trubochka', title: 'Трубочка', line: 'Тапни, когда печать окажется под трубочкой.', art: 'straw' },
   { slug: 'bashnya-stakanov', title: 'Башня стаканов', line: 'Тапни, когда стакан над башней: ровнее — выше.', art: 'tower' },
-  { slug: 'maska', title: 'Маска WeDrink', line: 'Камера, образ напитка на лице и игра с ингредиентами. Без призов', art: 'mask', free: true }
+  { slug: 'maska', title: 'Маска WeDrink', line: 'Камера, образ напитка на лице и игра с ингредиентами. Без призов', art: 'mask', free: true },
+  { slug: 'sloi', title: 'Слои', line: 'Переливай слои напитка, пока каждый стакан не станет одного цвета.', art: 'layers', isNew: true, visible: false, newUntil: '' },
+  { slug: 'begi-s-chaem', title: 'Беги с чаем', line: 'Беги по улице, уворачивайся и лови тапиоку.', art: 'run', isNew: true, visible: false, newUntil: '' },
+  { slug: 'podnos', title: 'Поднос', line: 'Расставляй фигурки на подносе: полные линии сгорают.', art: 'blocks', isNew: true, visible: false, newUntil: '' }
 ];
 
 function pickSeason(d) {
@@ -991,15 +1001,19 @@ function daysWord(n) {
 var CUP_SVG = '<svg viewBox="0 0 24 26" aria-hidden="true"><path d="M3 4h18l-2.2 18.4a2 2 0 0 1-2 1.6H7.2a2 2 0 0 1-2-1.6z"/></svg>';
 var GO_SVG = '<span class="cta">Играть<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2l6 6-6 6"/></svg></span>';
 var grid = document.getElementById('grid'), cards = [];
+var SHOW_ALL = /[?&]show=all(?:&|$)/.test(String(window.location.search || ''));     // ?show=all — показать и скрытые игры (проверка)
+function isNewNow(g) { return !!g.isNew && dateKey(new Date()) < (g.newUntil || NEW_UNTIL); }    // метка «Новая» до даты newUntil
 (function buildCards() {
-  var i, g, a, cv;
+  var i, g, a, cv, b;
   for (i = 0; i < GAMES.length; i++) {
     g = GAMES[i];
+    if (g.visible === false && !SHOW_ALL) continue;       // скрытая игра: карточки нет
     a = document.createElement('a');
     a.className = 'card';
     a.href = WDX.withParams('./' + g.slug + '/index.html' + (g.free ? '' : seasonParam));     // параметры запуска VK / MAX / Telegram не теряем
     a.innerHTML = '<canvas width="84" height="84" aria-hidden="true"></canvas><div class="tx"><h2></h2><p></p><span class="left"></span></div>' + GO_SVG;
     a.querySelector('h2').textContent = g.title;
+    if (isNewNow(g)) { b = document.createElement('span'); b.className = 'new'; b.textContent = 'Новая'; a.querySelector('h2').appendChild(b); }
     a.querySelector('p').textContent = g.line;
     grid.appendChild(a);
     cv = a.querySelector('canvas');
@@ -1094,6 +1108,61 @@ var ART = {
     circ(c, 34, 48, 2.6, INK); circ(c, 50, 48, 2.6, INK);
     c.strokeStyle = RED; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath(); c.arc(42, 56, 8, 0.25, 2.9); c.stroke();
     for (i = 0; i < 3; i++) circ(c, 30 + i * 12, 69 + 2 * Math.sin(t * 2 + i), 3.4, PEARL);
+  },
+  merge: function (c, t) {                 // шарики в стакане: падающий сливается в больший
+    var p = (t * 0.5) % 1, y, r, k;
+    glassCup(c, 42, 24, 46, 34, 52, null, 0);
+    circ(c, 32, 69, 7.5, '#7B4FA3'); circ(c, 51, 68, 8.5, '#EFC02F'); circ(c, 29.8, 66.6, 2, 'rgba(255,255,255,.6)'); circ(c, 48.4, 65.4, 2.2, 'rgba(255,255,255,.6)');
+    circ(c, 41.5, 59, 5.5, PEARL);
+    if (p < 0.55) { y = 6 + (p / 0.55) * (p / 0.55) * 47; circ(c, 41.5, y, 5.5, PEARL); circ(c, 40, y - 1.6, 1.5, 'rgba(255,255,255,.55)'); }
+    else { k = (p - 0.55) / 0.45; r = 5.5 + 4 * Math.sin(Math.min(1, k * 1.4) * 1.57) + 1.2 * Math.sin(k * 9) * (1 - k);
+      circ(c, 41.5, 59 - 2 * k, r, '#7C2A2E'); circ(c, 39, 56, 1.8, 'rgba(255,255,255,.6)');
+      c.strokeStyle = 'rgba(220,34,60,' + (0.6 * (1 - k)) + ')'; c.lineWidth = 2; c.beginPath(); c.arc(41.5, 59, 8 + 12 * k, 0, 6.2832); c.stroke(); }
+  },
+  beat: function (c, t) {                  // четыре линии, ноты падают на линию попадания
+    var i, ph, y, x, hit;
+    for (i = 0; i < 4; i++) {
+      x = 11 + i * 20;
+      c.fillStyle = 'rgba(27,143,142,.14)'; c.fillRect(x - 8, 4, 16, 76);
+      ph = (t * 0.85 + i * 0.31) % 1; y = 4 + ph * 58; hit = ph > 0.93;
+      circ(c, x, y, 5.5 + (hit ? 2 : 0), i % 2 ? RED : TEAL); circ(c, x - 1.6, y - 1.8, 1.6, 'rgba(255,255,255,.65)');
+    }
+    c.strokeStyle = 'rgba(31,42,42,.5)'; c.lineWidth = 2; c.beginPath(); c.moveTo(3, 64); c.lineTo(81, 64); c.stroke();
+    for (i = 0; i < 4; i++) { c.fillStyle = i % 2 ? RED : TEAL; c.beginPath(); c.moveTo(11 + i * 20 - 8, 68); c.lineTo(11 + i * 20 + 8, 68); c.lineTo(11 + i * 20 + 6, 78); c.lineTo(11 + i * 20 - 6, 78); c.closePath(); c.fill(); }
+  },
+  layers: function (c, t) {                // три стакана со слоями, из левого переливается слой
+    var k = 0.5 - 0.5 * Math.cos(t * 1.1), cols = [['#6B3F2A', '#E8455A', '#A982C6'], ['#E3C29A', '#E3C29A']], ang;
+    function lc(cx, y, cl, hh) {
+      var j;
+      c.save(); cupPath(c, cx, y, 22, 16, hh); c.clip();
+      for (j = 0; j < cl.length; j++) { c.fillStyle = cl[j]; c.fillRect(cx - 14, y + hh - (j + 1) * hh / 4.2, 28, hh / 4.2 + 0.6); }
+      c.restore(); glassCup(c, cx, y, 22, 16, hh, null, 0);
+    }
+    lc(44, 40, cols[1], 36); lc(70, 40, k > 0.5 ? ['#F8F5EE', '#A982C6'] : ['#F8F5EE'], 36);
+    c.save(); ang = -0.55 * Math.sin(k * 1.57); c.translate(32, 26); c.rotate(ang); c.translate(-18, -26);
+    lc(18, 26, cols[0].slice(0, k > 0.5 ? 2 : 3), 40); c.restore();
+    c.strokeStyle = '#A982C6'; c.lineWidth = 2.5; c.lineCap = 'round'; c.globalAlpha = k > 0.15 && k < 0.85 ? 1 : 0;
+    c.beginPath(); c.moveTo(35, 24); c.quadraticCurveTo(52, 26, 70, 44); c.stroke(); c.globalAlpha = 1;
+  },
+  run: function (c, t) {                   // дорога в перспективе: стакан бежит по дорожкам, навстречу тапиока
+    var i, z, y, w, x, lane = Math.floor(t * 0.6) % 3, sh = (t * 0.6) % 1;
+    c.fillStyle = '#6F8584'; c.beginPath(); c.moveTo(34, 6); c.lineTo(50, 6); c.lineTo(80, 80); c.lineTo(4, 80); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 1.5; c.setLineDash([5, 5]); c.lineDashOffset = -t * 20;
+    c.beginPath(); c.moveTo(39, 6); c.lineTo(30, 80); c.moveTo(45, 6); c.lineTo(54, 80); c.stroke(); c.setLineDash([]);
+    for (i = 0; i < 4; i++) {
+      z = (t * 0.7 + i * 0.25) % 1; y = 8 + z * 62; w = 2 + z * 5; x = 42 + (((i * 5) % 3) - 1) * (3 + z * 22);
+      circ(c, x, y, w, PEARL); circ(c, x - w * 0.3, y - w * 0.3, w * 0.28, 'rgba(255,255,255,.55)');
+    }
+    x = 42 + (lane === 0 ? -18 : (lane === 1 ? 0 : 18)) * (0.5 - 0.5 * Math.cos(sh * 3.14));
+    glassCup(c, x, 50, 18, 13, 26, TEA, 0.55);
+  },
+  blocks: function (c, t) {                // поле из клеток, фигурка опускается на место
+    var i, j, cs = [TEAL, RED, '#EFC02F', '#7B4FA3', '#7C2A2E'], k = (t * 0.5) % 1, dy = k < 0.7 ? (1 - k / 0.7) * 30 : 0;
+    var f = [[1,1,0,1,1],[0,1,1,1,0],[1,0,1,1,1],[1,1,0,1,1]];
+    function cell(x, y, col) { c.fillStyle = col; c.beginPath(); if (c.roundRect) c.roundRect(x, y, 12, 12, 3); else c.rect(x, y, 12, 12); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x + 2, y + 2, 5, 2); }
+    c.fillStyle = 'rgba(27,143,142,.12)'; c.fillRect(9, 12, 68, 68);
+    for (j = 0; j < 4; j++) for (i = 0; i < 5; i++) if (f[j][i]) cell(11 + i * 13, 24 + j * 13, cs[(i + j) % 5]);
+    cell(11 + 2 * 13, 24 + 2 * 13 - dy, cs[1]); cell(11 + 2 * 13, 24 - 13 + 2 * 13 - dy, cs[1]);
   },
   tower: function (c, t) {                 // башня из стаканов, верхний качается
     var i, sw = 14 * Math.sin(t * 1.4);
