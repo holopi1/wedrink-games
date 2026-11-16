@@ -626,12 +626,13 @@ body > .wdx-ibtn{position:absolute}
   var HALL_COLOR = { light: '#FBF7EC', winter: '#0F5059' };
   var GAME_COLOR = { light: '#FBF7EC', winter: '#0F5059' };
 
-  var cfg = { base: '', hall: false, sfx: false };
+  var cfg = { base: '', hall: false, sfx: false, shell: false };
   var cache = {}, ui = {}, audio = null, ctx = null, gain = null;
   var list = null, idx = 0, loaded = -1, seekTo = 0, wantPlay = false, listLoading = false, listTries = 0, gapT = 0, errs = 0, slots = [], cur = null, primed = false;
   var started = false, suspended = false, lastFocus = null, touched = false;
   var theme = { winter: false }, tgW = null, tgPending = false, tgLoading = false;
   var mxW = null, mxLoading = false, vkB = null, vkLoading = false, coded = null;
+  var holdMode = false, backCb = null, shellWin = null, shellClose = null, shellSt = { has: false, now: '' };
 
   /* ---------- профиль: читаем целиком, меняем одно поле ---------- */
   function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
@@ -681,7 +682,44 @@ body > .wdx-ibtn{position:absolute}
     if (m && !cfg.hall) q = '?season=' + m[1];
     return withParams(cfg.base + 'index.html' + q);
   }
-  function goHall() { try { window.location.href = hallUrl(); } catch (e) { /* адрес недоступен */ } }
+  function goHall() {
+    if (cfg.shell) { shellPost('close'); return; }       // в оболочке «в зал» — закрыть iframe
+    try { window.location.href = hallUrl(); } catch (e) { /* адрес недоступен */ }
+  }
+  function backFn() { if (cfg.hall) { if (backCb) backCb(); } else goHall(); }    // «назад» Telegram / MAX: в зале — закрыть игру, в игре — в зал
+  function setBack(cb) { backCb = typeof cb === 'function' ? cb : null; if (tgW) tgApply(); if (mxW) maxApply(); }
+
+  /* ---------- оболочка (Р-1176): зал держит плеер, игра внутри iframe шлёт ему сообщения; музыка не прерывается при переходах ---------- */
+  function shellFlag() {                      // игра открыта внутри iframe зала: в адресе shell=1 и есть родитель
+    var q = '';
+    try { q = String(window.location.search || ''); } catch (e) { q = ''; }
+    try { return /[?&]shell=1(?:&|$)/.test(q) && !!window.parent && window.parent !== window; } catch (e) { return false; }
+  }
+  function shellPost(t, d) {                  // игра -> зал
+    var m = { wdx: 1, t: t }, k;
+    if (d) for (k in d) if (Object.prototype.hasOwnProperty.call(d, k)) m[k] = d[k];
+    try { window.parent.postMessage(m, window.location.origin); } catch (e) { /* зала нет */ }
+  }
+  function shellState() {                     // зал -> игра: что показать в настройках
+    var m = { wdx: 1, t: 'state', has: !!(list && list.length), now: curTitle() };
+    try { if (shellWin && shellWin.postMessage) shellWin.postMessage(m, window.location.origin); } catch (e) { /* игра закрыта */ }
+  }
+  function onShellMsg(e) {
+    var m = e && e.data;
+    try { if (!e || e.origin !== window.location.origin || !isObj(m) || m.wdx !== 1) return; } catch (x) { return; }
+    if (cfg.shell) {                          // зал -> игре
+      if (m.t === 'state') { shellSt.has = !!m.has; shellSt.now = String(m.now || '').slice(0, 80); syncUi(); }
+      return;
+    }
+    if (!cfg.hall || !shellWin || e.source !== shellWin) return;      // игре -> залу: только от нашего iframe
+    if (m.t === 'ready') shellState();
+    else if (m.t === 'pref') { cache = {}; if (m.k === 'music') { if (pref('music')) play(); else stop(); } syncUi(); }
+    else if (m.t === 'next') { skip(); syncUi(); }
+    else if (m.t === 'hold') { holdMode = true; stop(); }
+    else if (m.t === 'release') { holdMode = false; if (pref('music')) play(); }
+    else if (m.t === 'close') { if (shellClose) shellClose(); }
+  }
+
 
   /* ---------- музыка: плейлист assets/music/playlist.json, плавные переходы между треками ---------- */
   var SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';   // для «разблокировки» запасных плееров первым касанием
@@ -704,7 +742,7 @@ body > .wdx-ibtn{position:absolute}
   }
   function loadList() {
     var done;
-    if (list || listLoading || listTries >= 2) return;
+    if (cfg.shell || list || listLoading || listTries >= 2) return;
     listLoading = true; listTries++;
     done = function (arr) {
       var out = [], i, o;
@@ -881,7 +919,7 @@ body > .wdx-ibtn{position:absolute}
   }
   function play() {
     var a, p, s;
-    if (!pref('music') || document.hidden) return;
+    if (cfg.shell || holdMode || !pref('music') || document.hidden) return;
     if (!list) { wantPlay = true; loadList(); return; }     // плейлист ещё не пришёл — музыка стартует, когда придёт
     a = ensureAudio();
     if (!a) return;
@@ -902,6 +940,7 @@ body > .wdx-ibtn{position:absolute}
   }
   function skip() {                           // кнопка «Следующий трек»: переход 0,6 с
     var n;
+    if (cfg.shell) { shellPost('next'); return; }
     if (!list || !pref('music')) return;
     errs = 0;
     n = nextIdx(idx);
@@ -962,9 +1001,9 @@ body > .wdx-ibtn{position:absolute}
     if (tgVer('6.9')) { tgCall('setHeaderColor', c); tgCall('setBottomBarColor', c); }
     try {
       if (tgVer('6.1') && tgW.BackButton) {
-        tgW.BackButton.offClick(goHall);
-        if (cfg.hall) tgW.BackButton.hide();
-        else { tgW.BackButton.onClick(goHall); tgW.BackButton.show(); }
+        tgW.BackButton.offClick(backFn);
+        if (cfg.hall && !backCb) tgW.BackButton.hide();
+        else { tgW.BackButton.onClick(backFn); tgW.BackButton.show(); }
       }
     } catch (e) { /* старый клиент */ }
   }
@@ -998,9 +1037,9 @@ body > .wdx-ibtn{position:absolute}
     try {
       bb = mxW.BackButton;
       if (bb) {
-        mxCall(bb, 'offClick', goHall);
-        if (cfg.hall) mxCall(bb, 'hide');
-        else { mxCall(bb, 'onClick', goHall); mxCall(bb, 'show'); }
+        mxCall(bb, 'offClick', backFn);
+        if (cfg.hall && !backCb) mxCall(bb, 'hide');
+        else { mxCall(bb, 'onClick', backFn); mxCall(bb, 'show'); }
       }
     } catch (e) { /* не страшно */ }
   }
@@ -1125,15 +1164,16 @@ body > .wdx-ibtn{position:absolute}
     }
     for (i = 0; i < rows.length; i++) rows[i].setAttribute('aria-checked', pref(rows[i].getAttribute('data-k')) ? 'true' : 'false');
     if (ui.now && ui.next) {
-      has = !!(list && list.length);
+      has = cfg.shell ? shellSt.has : !!(list && list.length);
       ui.now.hidden = !has; ui.next.hidden = !has;
-      if (has) { ui.now.textContent = on ? 'Сейчас играет: ' + curTitle() : 'Музыка выключена'; ui.next.disabled = !on; }
+      if (has) { ui.now.textContent = on ? 'Сейчас играет: ' + (cfg.shell ? shellSt.now : curTitle()) : 'Музыка выключена'; ui.next.disabled = !on; }
     }
+    if (cfg.hall && shellWin) shellState();     // игра в оболочке видит название трека и выключатель
   }
   function toggle(name) {
     var on = !pref(name);
     setPref(name, on);
-    if (name === 'music') { if (on) play(); else stop(); }
+    if (name === 'music') { if (cfg.shell) shellPost('pref', { k: name, v: on }); else if (on) play(); else stop(); }
     haptic('select');
     syncUi();
   }
@@ -1260,11 +1300,16 @@ body > .wdx-ibtn{position:absolute}
     var host, i, links;
     opts = opts || {};
     cfg.base = opts.base || ''; cfg.hall = !!opts.hall; cfg.sfx = !!opts.sfx;
+    cfg.shell = !cfg.hall && shellFlag();     // игра внутри зала: музыку и кнопки платформ ведёт зал
     loadList();                               // маленький json, не блокирует запуск
     host = cfg.hall ? document.body : (document.getElementById('app') || document.body);
     try { buildUi(host); } catch (e) { /* без настроек игра всё равно работает */ }
     links = document.querySelectorAll('.wdx-back');
-    for (i = 0; i < links.length; i++) links[i].setAttribute('href', hallUrl());
+    for (i = 0; i < links.length; i++) {
+      links[i].setAttribute('href', hallUrl());
+      if (cfg.shell) links[i].addEventListener('click', function (e) { e.preventDefault(); shellPost('close'); });
+    }
+    window.addEventListener('message', onShellMsg);
     if (!cfg.hall) {
       try { host.addEventListener('contextmenu', function (e) { e.preventDefault(); }); } catch (e) { /* не страшно */ }
     }
@@ -1275,7 +1320,8 @@ body > .wdx-ibtn{position:absolute}
     window.addEventListener('storage', function (e) {                 // выбор из другой вкладки
       if (e && e.key === PROFILE_KEY) { cache = {}; syncUi(); if (!pref('music')) stop(); }
     });
-    if (inTelegram()) tgLoad();
+    if (cfg.shell) shellPost('ready');
+    else if (inTelegram()) tgLoad();
     else if (inVk()) vkLoad();
     else if (inMax()) maxLoad();
   }
@@ -1285,7 +1331,14 @@ body > .wdx-ibtn{position:absolute}
     pref: pref, openSettings: openSettings, goHall: goHall, inTelegram: inTelegram, inMax: inMax, inVk: inVk,
     withParams: withParams, setCoded: setCoded, word: word, tail: tail, head: function (k) { return HEAD[k === 'drink' ? 'drink' : 'topping']; },
     COND: COND, VALID: VALID, _enc: encWord,
-    PREVIEW_WORD: 'ПРИМЕР'
+    PREVIEW_WORD: 'ПРИМЕР',
+    hold: function () { if (cfg.shell) shellPost('hold'); else { holdMode = true; stop(); } },        // пауза фоновой музыки на время раунда (ритм-игра)
+    release: function () { if (cfg.shell) shellPost('release'); else { holdMode = false; if (pref('music')) play(); } },
+    setBack: setBack,
+    shellAttach: function (win, onClose) { shellWin = win; shellClose = onClose; },
+    shellDetach: function () { shellWin = null; shellClose = null; },
+    inShell: function () { return cfg.shell; },
+    _dbg: function () { return { idx: idx, title: curTitle(), paused: audio ? audio.paused : null, t: audio ? audio.currentTime : null, started: started, hold: holdMode, shell: cfg.shell }; }
   };
 })();
 (function () {
