@@ -11,14 +11,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#156F6E">
-<meta name="description" content="Расставляй топпинги на подносе баристы: собирай целые строки и столбцы, пока идёт время.">
+<meta name="description" content="Расставляй топпинги на подносе баристы: собирай целые строки и столбцы за восемь подач.">
 <link rel="icon" type="image/webp" href="../assets/icon-96.webp">
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="WeDrink">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="WeDrink — Поднос">
-<meta property="og:description" content="Расставляй топпинги на подносе баристы: собирай целые строки и столбцы, пока идёт время.">
+<meta property="og:description" content="Расставляй топпинги на подносе баристы: собирай целые строки и столбцы за восемь подач.">
 <meta property="og:url" content="https://holopi1.github.io/wedrink-games/podnos/">
 <meta property="og:image" content="https://holopi1.github.io/wedrink-games/assets/mascot-512.webp">
 <meta property="og:image:type" content="image/webp">
@@ -381,7 +381,7 @@ body > .wdx-ibtn{position:absolute}
     <p class="catch" id="day-catch"></p>
     <div class="stats"><span id="st-streak"></span><span id="st-coll"></span></div>
     <div class="coll" id="coll" aria-hidden="true"></div>
-    <p class="rule">Перетащи фигурку на&nbsp;поднос. Целая строка или столбец сгорает.</p>
+    <p class="rule">Перетащи фигурку на&nbsp;поднос: целая строка или столбец сгорает. Подач всего восемь.</p>
     <button class="btn" id="btn-play" type="button">Играть</button>
     <a class="wdx-back" href="../index.html">Все игры</a>
     <div class="meta" id="start-attempts"></div>
@@ -2331,15 +2331,15 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   // Сложность дня: время раунда, цель в очках (TARGET) и вес каждого семейства фигур (порядок как в FAMS:
   // dot i2 i3 i4 i5 o2 o3 l3 l4 t4 zg c5 r6). ★ — мало больших и неудобных, ★★★ — чаще зигзаги и длинные палки.
   var LEVELS = [null,
-    { time: 60, tgt: 480, need: 3, tries: 8, w: [0.2, 9, 8, 3, 1.2, 10, 1.6, 12, 8, 6, 2.2, 1.6, 5] },
-    { time: 56, tgt: 495, need: 2, tries: 3, w: [0.2, 6, 7, 5, 2.6, 8, 2.6, 9, 9, 7, 5, 3.4, 5] },
-    { time: 52, tgt: 505, need: 1, tries: 2, w: [0.2, 3.5, 5, 7, 5, 6, 3.6, 6, 9, 7, 9, 5, 4] }];
-  var LP = function (L) { return 5 * L * (L + 1); };               // очки за L линий за один ход: 10, 30, 60, 100, ...
+    { moves: 24, time: 60, tgt: 279, need: 3, tries: 8, w: [0.2, 9, 8, 3, 1.2, 10, 1.6, 12, 8, 6, 2.2, 1.6, 5] },
+    { moves: 24, time: 60, tgt: 308, need: 2, tries: 3, w: [0.2, 6, 7, 5, 2.6, 8, 2.6, 9, 9, 7, 5, 3.4, 5] },
+    { moves: 24, time: 60, tgt: 333, need: 1, tries: 2, w: [0.2, 3.5, 5, 7, 5, 6, 3.6, 6, 9, 7, 9, 5, 4] }];
+  var LP = function (L) { return 5 * L * (L + 1); }; var STREAK_K = 0.35;                    // очки за L линий за ход: 10, 30, 60, 100, ...; серия — до ×2,4 за один ход: 10, 30, 60, 100, ...
   var PERFECT_BONUS = 40;                                           // поднос очищен целиком
   function moveScore(n, L, streak) {                                // n клеток фигуры + линии с множителем серии (серия = ходов подряд с линией)
-    return n + (L ? Math.round(LP(L) * (1 + 0.35 * (Math.min(streak, 5) - 1))) : 0);
+    return n + (L ? Math.round(LP(L) * (1 + STREAK_K * (Math.min(streak, 5) - 1))) : 0);
   }
-  var GAMMA = 0.75;                                                  // кривая счёта: чуть выпуклая вверх, чтобы медленный игрок не терял очки пропорционально времени
+  var GAMMA = 1;                       // линейная нормировка, как в брифе
   function toScore(p, lv) { return Math.round(300 * Math.pow(clamp(p / LEVELS[lv].tgt, 0, 1), GAMMA)); }
   function fits(rows, sh, gx, gy) {
     if (gx < 0 || gy < 0 || gx + sh.w > 8 || gy + sh.h > 8) return false;
@@ -2419,7 +2419,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   }
   // Ход: фигура из ячейки руки slot ставится в (gx, gy). Ход должен быть допустимым (fits).
   function place(S, slot, gx, gy) {
-    var p = S.hand[slot], sh = SHAPES[p.s], i, x, y, fin, L, rm, cm, add, clr = [], clrG = [], perfect = false, dead = false, refill = false, any = false;
+    var p = S.hand[slot], sh = SHAPES[p.s], i, x, y, fin, L, rm, cm, add, clr = [], clrG = [], perfect = false, dead = false, refill = false, any = false, over;
     for (i = 0; i < sh.c.length; i++) S.col[(gy + sh.c[i][1]) * 8 + gx + sh.c[i][0]] = p.g;
     fin = applyRows(S.rows, sh, gx, gy);
     rm = fin & 255; cm = fin >> 8; L = PC[rm] + PC[cm];
@@ -2432,13 +2432,15 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     add = moveScore(sh.n, L, S.streak) + (perfect ? PERFECT_BONUS : 0);
     S.pts += add; S.moves++;
     S.hand[slot] = null;
+    over = S.moves >= LEVELS[S.lv].moves;                          // подачи кончились: раунд ограничен и числом фигурок
     for (i = 0; i < 3; i++) if (S.hand[i]) any = true;
-    if (!any) { S.hand = makeHand(S); refill = true; }
+    if (over) { }
+    else if (!any) { S.hand = makeHand(S); refill = true; }
     else {
       dead = true;
       for (i = 0; i < 3; i++) if (S.hand[i] && anyFit(S.rows, SHAPES[S.hand[i].s])) dead = false;
     }
-    return { pts: add, n: sh.n, L: L, rm: rm, cm: cm, clr: clr, clrG: clrG, streak: S.streak, perfect: perfect, refill: refill, dead: dead };
+    return { pts: add, n: sh.n, L: L, rm: rm, cm: cm, clr: clr, clrG: clrG, streak: S.streak, perfect: perfect, refill: refill, dead: dead, over: over };
   }
   // Подсказка первого хода: лучшая по числу сгоревших линий постановка (при равенстве — ниже и левее)
   function hintMove(S) {
@@ -2466,7 +2468,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   var LINE_CAP = ['', 'Линия', 'Две линии', 'Три сразу', 'Четыре сразу', 'Пять сразу'];
 
   GAME.dayCatch = function (d) { return 'На подносе сегодня: <b>' + INGR_NAMES[d.ingr[0]] + '</b> и&nbsp;<b>' + INGR_NAMES[d.ingr[1]] + '</b>'; };
-  GAME.previewRows = function (s) { return rowsOf([['Линии', Math.round(s / 12)], ['Серия', clamp(Math.round(s / 55), 0, 8)], ['Фигуры', Math.round(s / 6.5)]]); };
+  GAME.previewRows = function (s) { return rowsOf([['Линии', Math.round(s / 27)], ['Серия', clamp(Math.round(s / 100), 0, 5)], ['Фигуры', clamp(Math.round(s / 12.5), 0, 24)]]); };
   GAME.active = function () { return !!G; };
 
   function mkTile(i, cell) {                        // спрайт плитки: объёмный «кубик желе» с подложкой и значком ингредиента
@@ -2578,7 +2580,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     if (!s) return;
     for (i = 0; i < 2; i++) { k = INGS.indexOf(s.drink.ingr[i]); if (k >= 0) fav.push(k); }
     S = newGame(s.seed, s.drink.level, fav);
-    G = { s: s, S: S, lv: s.drink.level, T: LEVELS[s.drink.level].time, t: 0, vt: 0, acc: 0, state: 'ready', drag: null, anc: null, hl: null, pv: [], can: [], hint: null, idle: 0,
+    G = { s: s, S: S, lv: s.drink.level, T: LEVELS[s.drink.level].time, M: LEVELS[s.drink.level].moves, prog: 0, t: 0, vt: 0, acc: 0, state: 'ready', drag: null, anc: null, hl: null, pv: [], can: [], hint: null, idle: 0,
       ox: new Float32Array(64), oy: new Float32Array(64), cs: new Float32Array(64), vx: new Float32Array(64), vy: new Float32Array(64), vs: new Float32Array(64),
       die: [], shine: [], chips: [], rings: [], ev: [], bump: 0, bumpV: 0, target: 0, disp: 0, shownI: 0, endT: 0, why: '', tick: 99, snow: makeSnow(SNOW_GAME), pillA: 0 };
     G.cs.fill(1);
@@ -2633,7 +2635,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     q.on = false;
     if (!REDUCED) G.bumpV += 55;
     G.idle = 0; G.hint = null;
-    el.hint.textContent = 'Собери строку или столбец из 8';
+    el.hint.textContent = 'Подача ' + Math.min(G.M / 3, ((S.moves / 3) | 0) + 1) + ' из ' + G.M / 3;
     Sfx.play('drop', 0.5); buzz([10]);
     pBurst(ccx, ccy + sh.h * c * 0.4, 6, { col: [TILES[p.g][0], '#FFFFFF'], sp: [50, 170], a: [-Math.PI, 0], g: 520, life: [0.25, 0.5], r: [1.5, 3] });
     if (R.L) {
@@ -2664,8 +2666,9 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     if (delta > 0) pText(R.L ? sx : ccx, R.L ? sy - c * 0.4 : ccy - sh.h * c * 0.5 - 10, '+' + delta, R.L ? css.accent : css.brandDark, R.L ? 26 + Math.min(10, R.L * 3) : 17);
     refreshCan();
     if (R.refill) deal();
-    if (R.dead) { Mascot.react('sad', 1.4, 0.3); finish('dead', 0.7); }
-    else if (after >= MAX_SCORE) finish('win', 0.9);
+    if (after >= MAX_SCORE) finish('win', 0.9);
+    else if (R.over) finish('done', 0.7);
+    else if (R.dead) { Mascot.react('sad', 1.4, 0.3); finish('dead', 0.7); }
   }
   function finish(why, delay) {
     if (G.state !== 'play') return;
@@ -2673,6 +2676,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     G.hint = null;
     if (why === 'time') { caption('Время!', 1100); Sfx.play('end', 0.5); }
     else if (why === 'dead') { caption('Места нет', 1200); Sfx.play('miss', 0.5); G.can = [false, false, false]; }
+    else if (why === 'done') { caption('Подачи кончились', 1200); Sfx.play('end', 0.5); }
     else { caption('Все 300!', 1300); Sfx.play('win', 0.6); Mascot.react('cheer', 1.4, 1); pGood(W / 2, H * 0.4, 30); pShake(6); }
   }
 
@@ -2741,7 +2745,8 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     } else { G.anc = null; G.hl = null; }
     if (G.state === 'play') {
       G.t += dt; left = Math.max(0, G.T - G.t);
-      setTimerBar(1 - G.t / G.T);
+      G.prog += (Math.max(G.t / G.T, G.S.moves / G.M) - G.prog) * expK(dt, 9);   // полоса — доля времени или подач, что больше
+      setTimerBar(1 - G.prog);
       if (!G.drag && !G.S.moves) G.idle += dt; else G.idle = 0;
       ds = Math.ceil(left);
       if (ds <= 3 && ds < G.tick && left > 0) { G.tick = ds; Sfx.play('tick', 0.5); }

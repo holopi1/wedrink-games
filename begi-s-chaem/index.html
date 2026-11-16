@@ -2405,50 +2405,84 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
 
   // Планировщик: точный разбор «как пройти лучше всего» по тактам 0,05 с. Состояние — дорожка (или переход между двумя, 3 такта,
   // занимает обе), фаза прыжка. Препятствия можно «раздуть» на margin секунд. Возвращает лучший набор действий и сумму очков.
-  function planDP(sc, m, n0, lane0, j0) {
-    var P = LV[sc.lv], K = Math.round(P.A / DT), K1 = K + 1, nT = Math.ceil(DUR / DT) + 6, NS = 11 * K1, o = sc.objs, i, ob, n, p, j, nj, idx, hg, a, lo, hi, hw, u, best, bi, b;
-    var V = new Float64Array((nT + 1) * NS), C = new Int8Array(nT * NS), blk = new Uint8Array(3 * nT), gv = new Float64Array(3 * nT), av = new Float64Array(3 * nT);
-    var hh = [0], vals = [0, 0, 0, 0], PF = [0, 1, 1, 2], PT = [1, 0, 2, 1], pr, rem, fr0, to, np, moves = 0, acts = [], ord = [1, 2, 3, 0];
+  // Планировщик устроен как три шага: dpInit (таблицы), dpRun (обратный проход по тактам; можно порциями по бюджету времени — так расписание
+  // следующей попытки считается заранее кусками по несколько мс), dpPlan (путь вперёд). planDP = все три подряд; результат от порционности не зависит.
+  var DPB = null;                                   // буферы синхронных вызовов переиспользуются (без выделения памяти на каждый вызов)
+  function dpInit(sc, m, fresh) {
+    var P = LV[sc.lv], K = Math.round(P.A / DT), K1 = K + 1, nT = Math.ceil(DUR / DT) + 6, NS = 11 * K1, o = sc.objs, i, ob, n, p, j, u, b, lo, hi, hw, idx, pr, rem, hh = [0], D, PF = [0, 1, 1, 2], PT = [1, 0, 2, 1];
+    var src;
+    if (fresh) src = { V: new Float64Array((nT + 1) * NS), C: new Int8Array(nT * NS), blk: new Uint8Array(3 * nT), gv: new Float64Array(3 * nT), av: new Float64Array(3 * nT) };
+    else {
+      if (!DPB || DPB.K !== K) DPB = { K: K, V: new Float64Array((nT + 1) * NS), C: new Int8Array(nT * NS), blk: new Uint8Array(3 * nT), gv: new Float64Array(3 * nT), av: new Float64Array(3 * nT) };
+      src = DPB; src.blk.fill(0); src.gv.fill(0); src.av.fill(0); src.V.fill(0, nT * NS);
+    }
+    D = { K: K, K1: K1, nT: nT, NS: NS, V: src.V, C: src.C, blk: src.blk, gv: src.gv, av: src.av, hh: hh, n: nT - 1, TL: [], TR: [], TN: [], TF: [], TT: [], TRM: [], lowJ: new Uint8Array(K1), airJ: new Uint8Array(K1), nJ: new Int32Array(K1) };
     for (j = 1; j <= K; j++) { u = (j - 0.5) / K; hh.push(4 * u * (1 - u)); }
     for (i = 0; i < o.length; i++) {
       ob = o[i];
       if (ob.k === 'p' || ob.k === 'i') {
         n = Math.floor(ob.t / DT); if (n >= nT) continue;
-        (ob.a ? av : gv)[ob.l * nT + n] += ob.k === 'i' ? ING_PTS : PEARL_PTS;
+        (ob.a ? D.av : D.gv)[ob.l * nT + n] += ob.k === 'i' ? ING_PTS : PEARL_PTS;
       } else {
         hw = hwOf(P, ob.k);
         lo = Math.max(0, Math.floor((ob.t - hw - m) / DT)); hi = Math.min(nT - 1, Math.floor((ob.t + hw + m) / DT));
-        for (n = lo; n <= hi; n++) { idx = ob.l * nT + n; b = ob.k === 'u' ? 1 : 2; if (blk[idx] < b) blk[idx] = b; }
+        for (n = lo; n <= hi; n++) { idx = ob.l * nT + n; b = ob.k === 'u' ? 1 : 2; if (D.blk[idx] < b) D.blk[idx] = b; }
       }
     }
     function trc(from, t2, r2) { return 3 + (from === 0 ? 0 : (from === 2 ? 3 : (t2 === 0 ? 1 : 2))) * 2 + (r2 - 1); }
-    function bad(l, nn, h2) { var q = blk[l * nT + nn]; return q === 2 || (q === 1 && h2 < LOW_H); }
-    function gain(l, nn, h2) { return (h2 < AIR_H ? gv : av)[l * nT + nn]; }
-    for (n = nT - 1; n >= 0; n--) {
-      for (p = 0; p < 11; p++) {
-        for (j = 0; j <= K; j++) {
-          idx = n * NS + p * K1 + j;
-          nj = j === 0 ? 0 : (j < K ? j + 1 : 0);
-          hg = j === 0 ? 0 : hh[j];
-          vals[0] = vals[1] = vals[2] = vals[3] = NEG;
-          if (p < 3) {
-            if (!bad(p, n, hg)) vals[0] = gain(p, n, hg) + V[(n + 1) * NS + p * K1 + nj];
-            if (p > 0 && !bad(p, n, hg) && !bad(p - 1, n, hg)) vals[1] = gain(p, n, hg) + V[(n + 1) * NS + trc(p, p - 1, 2) * K1 + nj] - EPS;
-            if (p < 2 && !bad(p, n, hg) && !bad(p + 1, n, hg)) vals[2] = gain(p, n, hg) + V[(n + 1) * NS + trc(p, p + 1, 2) * K1 + nj] - EPS;
-            if (j === 0 && !bad(p, n, hh[1])) vals[3] = gain(p, n, hh[1]) + V[(n + 1) * NS + p * K1 + 2] - EPS;
-          } else {
-            pr = (p - 3) >> 1; rem = ((p - 3) & 1) + 1; fr0 = PF[pr]; to = PT[pr];
-            if (!bad(fr0, n, hg) && !bad(to, n, hg)) vals[0] = (rem === 1 ? gain(to, n, hg) : 0) + V[(n + 1) * NS + (rem === 2 ? trc(fr0, to, 1) : to) * K1 + nj];
+    for (p = 0; p < 11; p++) {
+      if (p < 3) { D.TL.push(p > 0 ? trc(p, p - 1, 2) : -1); D.TR.push(p < 2 ? trc(p, p + 1, 2) : -1); D.TN.push(-1); D.TF.push(p); D.TT.push(p); D.TRM.push(0); }
+      else { pr = (p - 3) >> 1; rem = ((p - 3) & 1) + 1; D.TL.push(-1); D.TR.push(-1); D.TF.push(PF[pr]); D.TT.push(PT[pr]); D.TRM.push(rem); D.TN.push(rem === 2 ? trc(PF[pr], PT[pr], 1) : PT[pr]); }
+    }
+    for (j = 0; j <= K; j++) { D.lowJ[j] = hh[j] < LOW_H ? 1 : 0; D.airJ[j] = hh[j] < AIR_H ? 0 : 1; D.nJ[j] = j === 0 ? 0 : (j < K ? j + 1 : 0); }
+    return D;
+  }
+  function dpTick(D, n) {
+    var K = D.K, K1 = D.K1, nT = D.nT, NS = D.NS, V = D.V, C = D.C, blk = D.blk, gv = D.gv, av = D.av, TL = D.TL, TR = D.TR, TN = D.TN, TF = D.TF, TT = D.TT, TRM = D.TRM, lowJ = D.lowJ, airJ = D.airJ, nJ = D.nJ;
+    var LOWH = LOW_H, NG = NEG, NG2 = NEG / 2, EP = EPS, low1 = D.hh[1] < LOWH, air1 = D.hh[1] >= AIR_H;
+    var row = n * NS, nrow = row + NS, p, j, pb, nj, hg, v0, v1, v2, v3, bl0, bl1, g, best, th, bi, idx;
+    for (p = 0; p < 11; p++) {
+      pb = p * K1;
+      for (j = 0; j <= K; j++) {
+        nj = nJ[j]; hg = lowJ[j];             // hg: 1 = ниже порога лужи (лужа держит)
+        v0 = v1 = v2 = v3 = NG;
+        if (p < 3) {
+          bl0 = blk[p * nT + n]; bl0 = bl0 === 2 || (bl0 === 1 && hg === 1);
+          if (!bl0) {
+            g = (airJ[j] ? av : gv)[p * nT + n];
+            v0 = g + V[nrow + pb + nj];
+            if (p > 0) { bl1 = blk[(p - 1) * nT + n]; if (!(bl1 === 2 || (bl1 === 1 && hg === 1))) v1 = g + V[nrow + TL[p] * K1 + nj] - EP; }
+            if (p < 2) { bl1 = blk[(p + 1) * nT + n]; if (!(bl1 === 2 || (bl1 === 1 && hg === 1))) v2 = g + V[nrow + TR[p] * K1 + nj] - EP; }
           }
-          best = Math.max(vals[0], vals[1], vals[2], vals[3]);
-          if (best < NEG / 2) { V[idx] = NEG; C[idx] = -1; continue; }
-          bi = 0;
-          for (i = 0; i < 4; i++) if (vals[ord[i]] >= best - 1e-9) { bi = ord[i]; break; }
-          V[idx] = best; C[idx] = bi;
+          if (j === 0) {
+            bl1 = blk[p * nT + n];
+            if (!(bl1 === 2 || (bl1 === 1 && low1))) v3 = (air1 ? av : gv)[p * nT + n] + V[nrow + pb + 2] - EP;
+          }
+        } else {
+          bl0 = blk[TF[p] * nT + n]; bl1 = blk[TT[p] * nT + n];
+          if (!(bl0 === 2 || (bl0 === 1 && hg === 1)) && !(bl1 === 2 || (bl1 === 1 && hg === 1)))
+            v0 = (TRM[p] === 1 ? (airJ[j] ? av : gv)[TT[p] * nT + n] : 0) + V[nrow + TN[p] * K1 + nj];
         }
+        best = v0 > v1 ? v0 : v1; if (v2 > best) best = v2; if (v3 > best) best = v3;
+        idx = row + pb + j;
+        if (best < NG2) { V[idx] = NG; C[idx] = -1; continue; }
+        th = best - 1e-9; bi = 0;
+        if (v1 >= th) bi = 1; else if (v2 >= th) bi = 2; else if (v3 >= th) bi = 3;
+        V[idx] = best; C[idx] = bi;
       }
     }
-    p = lane0; j = j0;
+  }
+  // budget > 0 (мс) и now() — порция: сделать сколько успеем за бюджет и вернуть false, если не закончили; без бюджета — до конца
+  function dpRun(D, budget, now) {
+    var t0 = budget ? now() : 0, c = 0;
+    while (D.n >= 0) {
+      dpTick(D, D.n); D.n--;
+      if (budget && (++c & 3) === 0 && now() - t0 > budget) break;
+    }
+    return D.n < 0;
+  }
+  function dpPlan(D, n0, lane0, j0) {
+    var K = D.K, K1 = D.K1, nT = D.nT, NS = D.NS, V = D.V, C = D.C, TL = D.TL, TR = D.TR, TN = D.TN, p = lane0, j = j0, n, idx, a, nj, np, acts = [];
     if (V[n0 * NS + p * K1 + j] < NEG / 2) return { ok: false, val: 0, acts: [], moves: 0 };
     for (n = n0; n < nT - 2; n++) {
       idx = n * NS + p * K1 + j; a = C[idx];
@@ -2456,29 +2490,34 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
       nj = j === 0 ? 0 : (j < K ? j + 1 : 0);
       if (p < 3) {
         if (a === 0) { np = p; }
-        else if (a === 1) { np = trc(p, p - 1, 2); acts.push({ n: n, k: 'L' }); }
-        else if (a === 2) { np = trc(p, p + 1, 2); acts.push({ n: n, k: 'R' }); }
+        else if (a === 1) { np = TL[p]; acts.push({ n: n, k: 'L' }); }
+        else if (a === 2) { np = TR[p]; acts.push({ n: n, k: 'R' }); }
         else { np = p; nj = 2; acts.push({ n: n, k: 'J' }); }
-      } else {
-        pr = (p - 3) >> 1; rem = ((p - 3) & 1) + 1; fr0 = PF[pr]; to = PT[pr];
-        np = rem === 2 ? trc(fr0, to, 1) : to;
-      }
+      } else np = TN[p];
       p = np; j = nj;
     }
     return { ok: true, val: V[n0 * NS + lane0 * K1 + j0] + EPS * acts.length, acts: acts };
   }
+  function planDP(sc, m, n0, lane0, j0) {
+    var D = dpInit(sc, m, false);
+    dpRun(D, 0, null);
+    return dpPlan(D, n0, lane0, j0);
+  }
+  function schedFinish(sc, pl) {                    // идеал и цель счёта по результату планировщика
+    sc.ideal = Math.round(pl.val);
+    sc.target = Math.max(1, sc.ideal * LV[sc.lv].kap);
+    sc.ok = pl.ok;
+    return sc;
+  }
 
   function genSchedule(seed, lv) {
-    var P = LV[lv], tries, sc, pl;
+    var tries, sc, pl;
     for (tries = 0; tries < 6; tries++) {
       sc = genTry((seed ^ (tries * 0x3C6EF372)) | 0, lv, tries >= 5);
       pl = planDP(sc, 0, 0, 1, 0);
       if (pl.ok) break;
     }
-    sc.ideal = Math.round(pl.val);
-    sc.target = Math.max(1, sc.ideal * P.kap);
-    sc.ok = pl.ok;
-    return sc;
+    return schedFinish(sc, pl);
   }
 
   function newRun(sc, withEv) {
@@ -2836,11 +2875,42 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     CX = W / 2; YH = H * 0.26; YP = H * 0.8; LW = Math.min(W * 0.25, H * 0.18);
     buildScene(); buildSprites();
   };
+  // Расписание следующей попытки считается заранее кусками по ~4 мс (setTimeout), пока игрок на стартовом экране или читает результат,
+  // и берётся из кэша по seed. seed следующей попытки известен заранее: дата + число начатых попыток + 1. Не успели к нажатию — доделываем
+  // остаток на месте (он короче полного расчёта); seed не совпал (смена даты) — считаем с нуля. Результат тот же, что у genSchedule.
+  var PRE = null, preTimer = 0;
+  function preKey() {
+    var now = new Date(), day = loadDay();
+    if (attemptsLeft(day) === 0) return null;
+    return { seed: seedFor(dateIntOf(dateKey(now)), day.used + 1), lv: (DRINKS[now.getDay()] || DRINKS[1]).level };
+  }
+  function preFinish(job) {                         // дорасчитать синхронно; false — планировщик не нашёл путь (запасной полный расчёт)
+    var pl;
+    dpRun(job.D, 0, null);
+    pl = dpPlan(job.D, 0, 1, 0);
+    if (pl.ok) schedFinish(job.sc, pl); else job.sc = genSchedule(job.seed, job.lv);
+    job.D = null; job.done = true;
+  }
+  function preStep() {
+    var k = preKey(), sc;
+    try {
+      if (!k) { PRE = null; return; }
+      if (!PRE || PRE.seed !== k.seed || PRE.lv !== k.lv) { sc = genTry((k.seed ^ 0) | 0, k.lv, false); PRE = { seed: k.seed, lv: k.lv, sc: sc, D: dpInit(sc, 0, true), done: false }; }
+      if (PRE.done) return;
+      if (dpRun(PRE.D, 4, nowMs)) preFinish(PRE); else preTimer = setTimeout(preStep, 8);
+    } catch (e) { PRE = null; }
+  }
+  function prefetch(delay) { clearTimeout(preTimer); preTimer = setTimeout(preStep, delay); }
+  GAME.init = function () { prefetch(300); };
   GAME.start = function () {
     var s = beginAttempt(), lv, sc, S, i;
     if (!s) return;
-    lv = s.drink.level; sc = genSchedule(s.seed, lv); S = newRun(sc, true);
-    G = { s: s, P: LV[lv], sc: sc, S: S, state: 'ready', time: 0, ph: 0, acc: 0, slow: 0, flash: 0, runPh: 0, sq: 0, sqV: 0, cupA: 0, cupV: 0, qv: 1, chain: 0, chainT: -9, Lc: LV[lv].L0, obs: [], oi: 0, pass: 0, paused: false, buf: [], end: 0, hudT: 0, hudV: -1, sfxT: 0, dustT: 0, prevT: 0 };
+    lv = s.drink.level;
+    clearTimeout(preTimer);
+    if (PRE && PRE.seed === s.seed && PRE.lv === lv) { if (!PRE.done) preFinish(PRE); sc = PRE.sc; } else sc = genSchedule(s.seed, lv);
+    PRE = null;
+    S = newRun(sc, true);
+    G = { s: s, lv: lv, P: LV[lv], sc: sc, S: S, state: 'ready', time: 0, ph: 0, acc: 0, slow: 0, flash: 0, runPh: 0, sq: 0, sqV: 0, cupA: 0, cupV: 0, qv: 1, chain: 0, chainT: -9, Lc: LV[lv].L0, obs: [], oi: 0, pass: 0, paused: false, buf: [], end: 0, hudT: 0, hudV: -1, sfxT: 0, dustT: 0, prevT: 0 };
     for (i = 0; i < sc.objs.length; i++) if (sc.objs[i].k === 'u' || sc.objs[i].k === 's' || sc.objs[i].k === 'w') G.obs.push(i);
     snowA = makeSnow(SNOW_GAME); ptr = null;
     Mascot.load();
@@ -2901,6 +2971,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     var g = G, S = g.S, score = runScore(S), rows = rowsOf([['Шарики', S.nP], ['Бонусы', S.nI], ['Напиток', Math.round(S.q * 100) + '%']]);
     G = null; ptr = null;
     endAttempt(g.s, score, rows);
+    prefetch(900);
   }
   GAME.update = function (now, dt) {
     var S, t0, sc;
@@ -3011,6 +3082,18 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     if (G.paused) { resume(); return; }
     if (!e.repeat) act(a);
   });
+
+  // Для сценарной проверки (?qa=1): чтение состояния раунда снаружи. В обычной игре не создаётся.
+  try {
+    if (/[?&]qa=1(?:&|$)/.test(String(window.location.search || ''))) window.__qa = {
+      st: function () {
+        var S;
+        if (!G) return null;
+        S = G.S;
+        return { st: G.state, t: S.t, tl: S.tl, x: S.x, jt: S.jt, h: S.h, hits: S.hits, nP: S.nP, nI: S.nI, pts: S.pts, q: S.q, score: runScore(S), seed: G.s.seed, lv: G.lv, ideal: G.sc.ideal, target: G.sc.target, n: G.sc.objs.length, slow: G.slow, paused: G.paused };
+      }
+    };
+  } catch (e) { /* не критично */ }
 
 
   /* =====================================================================

@@ -2293,16 +2293,17 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   // Всё, что влияет на очки, берётся из seed (порядок предметов) и из координат бросков игрока. Math.random здесь нет.
   var SL_DT = 1 / 60, SL_SUB = 2, SL_IT = 4;         // шаг физики 1/60 с, 2 под-шага, 4 прохода решателя
   var SL_G = 300, SL_CM = 100, SL_E = 0.18, SL_BT = 32, SL_MU = 0.2, SL_MG = 0.9, SL_LOCK = 0.12;   // тяжесть, отскок, порог отскока, трение, допуск касания при слиянии, пауза цепочки
+  var SL_TOL = 3, SL_QP = 3, SL_QWIN = 1.2;          // «точный бросок»: упал на предмет того же уровня, центры по x ближе SL_TOL — вся цепочка слияний от него (SL_QWIN с) множится на SL_QP
   var SL_TIME = 50, SL_SETTLE = 1.6, SL_FULLT = 1.5, SL_FULLSET = 1.0;   // время раунда; «успокоение» после конца; сколько можно держать выше линии
   // цепочка: тапиока → красная фасоль → кокосовое желе → персиковое желе → сырная пенка → Oreo → стакан 500 мл → стакан 700 мл (→ золото)
   var SL_R = [7.3, 8.8, 10.7, 12.9, 15.5, 18.8, 22.7, 27.4];
-  var SL_PTS = [0, 2, 4, 6, 9, 14, 21, 32, 70];     // очки за слияние В уровень k; [8] — золотой финал двух стаканов 700 мл
+  var SL_PTS = [0, 2, 3, 5, 7, 10, 14, 20, 40];     // очки за слияние В уровень k; [8] — золотой финал двух стаканов 700 мл
   var SL_NAMES = ['Тапиока', 'Фасоль', 'Кокос', 'Персик', 'Пенка', 'Oreo', 'Стакан 500', 'Стакан 700', 'Золото'];
-  // три набора сложности. T — «цель» очков: score = round(300 · clamp(очки / T, 0, 1)); подобрана симуляцией (sim.js)
+  // три набора сложности. T — «цель» очков, g — сжатие шкалы к вершине (slScoreP); оба подобраны симуляцией (sim.js)
   var SL_LV = {
-    1: { W: 116, H: 128, bot: 0.8, line: 8, drops: 28, wts: [32, 30, 22, 12, 4], same: 0.25, cd: 0.5, T: 235 },
-    2: { W: 108, H: 128, bot: 0.8, line: 18, drops: 28, wts: [26, 27, 22, 16, 9], same: 0.08, cd: 0.5, T: 270 },
-    3: { W: 104, H: 128, bot: 0.8, line: 22, drops: 28, wts: [18, 24, 24, 21, 13], same: 0, cd: 0.5, T: 285 }
+    1: { W: 116, H: 128, bot: 0.8, line: 8, drops: 28, wts: [32, 30, 22, 12, 4], same: 0.25, cd: 0.5, T: 382, g: 2.3 },
+    2: { W: 108, H: 128, bot: 0.8, line: 18, drops: 28, wts: [26, 27, 22, 16, 9], same: 0.08, cd: 0.5, T: 423, g: 2.5 },
+    3: { W: 104, H: 128, bot: 0.8, line: 22, drops: 28, wts: [18, 24, 24, 21, 13], same: 0, cd: 0.5, T: 527, g: 2.9 }
   };
   function slWorld(lv, seed) {
     var P = SL_LV[lv], a = P.W / 2, b = a * P.bot, H = P.H, k = 9, s2 = 0.70710678, L = Math.sqrt(H * H + (a - b) * (a - b));
@@ -2311,7 +2312,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
       // полуплоскости «внутри стакана»: nx, ny, d — левая стена, правая стена, дно, два скоса у дна
       pl: [H / L, -(a - b) / L, -a * H / L, -H / L, -(a - b) / L, -a * H / L, 0, -1, -H, s2, -s2, s2 * (-b + k - H), -s2, -s2, -s2 * (b - k) - s2 * H],
       pi: [], pj: [], cA: [], cB: [], cX: [], cY: [], cU: [],
-      state: 0, st: 0, cd: 0.45, dropped: 0, lastDrop: 0, over: 0, full: false,
+      perf: 0, state: 0, st: 0, cd: 0.45, dropped: 0, lastDrop: 0, over: 0, full: false,
       pts: 0, merges: 0, combo: 0, ct: -9, maxCombo: 0, top: 0, golds: 0, rec: false, ev: []
     };
   }
@@ -2334,7 +2335,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     if (!slCan(w)) return null;
     lv = slQ(w, w.dropped); r = SL_R[lv]; m = slLimit(w, lv);
     x = clamp(x, -m, m);
-    bd = { id: w.nid++, x: x, y: -r - 3, ox: x, oy: -r - 3, vx: 0, vy: 60, r: r, m: r * r, lv: lv, age: 0, rot: 0, imp: 0, dead: false, mt: 0 };
+    bd = { id: w.nid++, x: x, y: -r - 3, ox: x, oy: -r - 3, vx: 0, vy: 60, r: r, m: r * r, lv: lv, age: 0, rot: 0, imp: 0, dead: false, mt: 0, fr: true, qz: 0 };
     w.bodies.push(bd); w.dropped++; w.cd = w.P.cd; w.lastDrop = w.t;
     slQ(w, w.dropped);
     return bd;
@@ -2350,19 +2351,21 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   }
   function slMerge(w, p, q) {
     var nl = p.lv + 1, m = p.m + q.m, x = (p.x * p.m + q.x * q.m) / m, y = (p.y * p.m + q.y * q.m) / m, vx = (p.vx * p.m + q.vx * q.m) / m, vy = (p.vy * p.m + q.vy * q.m) / m;
-    var mult, gain, nb = null, gold = nl >= 8;
+    var mult, gain, nb = null, gold = nl >= 8, fb = p.fr !== q.fr ? (p.fr ? p : q) : null, tb = fb ? (fb === p ? q : p) : null, pf = !!fb && Math.abs(fb.x - tb.x) <= SL_TOL, qq = Math.max(p.qz, q.qz), Q;
+    if (pf) { qq = w.t + SL_QWIN; w.perf++; }
+    Q = qq > w.t ? SL_QP : 1;
     w.combo = (w.t - w.ct < 0.8) ? w.combo + 1 : 1; w.ct = w.t;
     if (w.combo > w.maxCombo) w.maxCombo = w.combo;
     mult = 1 + 0.1 * Math.min(w.combo - 1, 3);
-    gain = SL_PTS[nl] * mult; w.pts += gain; w.merges++;
+    gain = SL_PTS[nl] * mult * Q; w.pts += gain; w.merges++;
     p.dead = true; q.dead = true;
     if (gold) w.golds++;
     else {
       if (nl > w.top) w.top = nl;
-      nb = { id: w.nid++, x: x, y: y, ox: x, oy: y, vx: vx, vy: vy, r: SL_R[nl], m: SL_R[nl] * SL_R[nl], lv: nl, age: Math.max(p.age, q.age), rot: p.rot, imp: 0, dead: false, mt: w.t + SL_LOCK };
+      nb = { id: w.nid++, x: x, y: y, ox: x, oy: y, vx: vx, vy: vy, r: SL_R[nl], m: SL_R[nl] * SL_R[nl], lv: nl, age: Math.max(p.age, q.age), rot: p.rot, imp: 0, dead: false, mt: w.t + SL_LOCK, fr: false, qz: qq };
       w.bodies.push(nb);
     }
-    if (w.rec) w.ev.push({ k: gold ? 'g' : 'm', x: x, y: y, lv: nl, gain: gain, combo: w.combo, id: nb ? nb.id : -1, a: [p.x, p.y, q.x, q.y], r: p.r });
+    if (w.rec) w.ev.push({ k: gold ? 'g' : 'm', x: x, y: y, lv: nl, gain: gain, combo: w.combo, q: Q > 1, pf: pf, id: nb ? nb.id : -1, a: [p.x, p.y, q.x, q.y], r: p.r });
   }
   function slSub(w, h) {
     var B = w.bodies, n = B.length, pr = w.pi, pq = w.pj, np = 0, pl = w.pl, nc = 0, i, j, k, c, it, bi, bj, dx, dy, d2, d, rr, s, nx, ny, wi, wj, u, vn, vt, dv, merged = false;
@@ -2433,6 +2436,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
       dx = bi.x - bj.x; dy = bi.y - bj.y; rr = bi.r + bj.r + SL_MG;
       if (dx * dx + dy * dy <= rr * rr) { slMerge(w, bi, bj); merged = true; }
     }
+    for (c = 0; c < nc; c++) { B[cA[c]].fr = false; if (cB[c] >= 0) B[cB[c]].fr = false; }   // первое касание: дальше предмет уже не «свежий»
     if (merged) { for (i = 0, j = 0; i < B.length; i++) if (!B[i].dead) B[j++] = B[i]; B.length = j; }
   }
   function slStep(w) {                                                        // один тик 1/60 с
@@ -2449,7 +2453,9 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
       if (w.st >= (w.full ? SL_FULLSET : SL_SETTLE)) w.state = 2;
     }
   }
-  function slScore(w) { return Math.round(300 * clamp(w.pts / w.P.T, 0, 1)); }
+  // очки → 0–300: score = round(300 · (1 − (1 − clamp(очки / T))^g)). Первые очки ценнее, к вершине шкала сжимается: счёт меньше зависит от везения кучи, 300 — всё равно только при очках не ниже ~T
+  function slScoreP(P, pts) { return Math.round(300 * (1 - Math.pow(1 - clamp(pts / P.T, 0, 1), P.g))); }
+  function slScore(w) { return slScoreP(w.P, w.pts); }
 /*</LOGIC>*/
 
 
@@ -2616,7 +2622,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
   GAME.dayCatch = function (d) { return 'Сливай: тапиока, фасоль, желе… до стакана <b>' + d.name + '</b>'; };
   GAME.previewRows = function (score) {
     var m = Math.round(score / 6.5), t = score >= 290 ? 8 : (score >= 240 ? 7 : (score >= 190 ? 6 : (score >= 130 ? 5 : (score >= 80 ? 4 : (score >= 40 ? 3 : (score > 0 ? 2 : 0))))));
-    return rowsOf([['Слияний', m], ['Комбо', 'x' + (1 + Math.floor(score / 75))], ['Высший', SL_VAL[t]]]);
+    return rowsOf([['Слияний', m], ['Точных', Math.round(score / 30)], ['Высший', SL_VAL[t]]]);
   };
   GAME.active = function () { return !!G; };
   GAME.layout = function () {
@@ -2682,13 +2688,14 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
       Sfx.play('merge', e.lv / 7); if (e.combo >= 3 && w.tick % 2 === 0) Sfx.play('great', 0.5);
       d = slScoreDelta(e.gain); if (d > 0) pText(p[0], p[1] - R - 6, '+' + d, e.lv >= 5 ? '#FFD45C' : '#FFFFFF', 15 + e.lv * 1.6);
       if (e.combo >= 2) pText(p[0], p[1] + R + 12, 'x' + e.combo, css.accent, 17 + Math.min(e.combo, 6) * 2);
+      if (e.pf) { pText(p[0], p[1] - R - 30, 'Точно!', '#FFD45C', 20); pBurst(p[0], p[1], 8, { col: ['#FFD45C', '#FFF3B0', '#FFFFFF'], sp: [90, 260], g: 200, life: [0.3, 0.6], r: [1.5, 2.8], kind: 'spark' }); Sfx.play('perfect', 0.6); }
       if (e.combo >= 3 || e.lv >= 6) Mascot.react('wow', 0.9, 0.9); else if (e.lv >= 4) Mascot.react('cheer', 0.7, 0.6);
       if (e.lv >= 5) pShake(2 + e.lv * 0.6);
       buzz([e.lv >= 5 ? 14 : 6]);
     }
     evs.length = 0;
   }
-  function slScoreDelta(gain) { var w = G.w, before = Math.round(300 * clamp((w.pts - gain) / w.P.T, 0, 1)); return slScore(w) - before; }
+  function slScoreDelta(gain) { var w = G.w; return slScore(w) - slScoreP(w.P, w.pts - gain); }
 
   function slCaptions(w) {
     if (w.state === 1 && !G.endMsg) {
@@ -2747,7 +2754,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     slCaptions(w);
     if (w.state === 2) {
       G.state = 'done'; var g = G; G = null; setHud(slScore(g.w));
-      endAttempt(g.s, slScore(g.w), rowsOf([['Слияний', g.w.merges], ['Комбо', 'x' + Math.max(1, g.w.maxCombo)], ['Высший', SL_VAL[g.w.golds ? 8 : g.w.top]]]));
+      endAttempt(g.s, slScore(g.w), rowsOf([['Слияний', g.w.merges], ['Точных', g.w.perf], ['Высший', SL_VAL[g.w.golds ? 8 : g.w.top]]]));
       return false;
     }
     return true;
@@ -2827,7 +2834,8 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
           ld = slLand(w, G.hx, SL_R[lv]);
           c.save(); c.lineCap = 'round'; c.setLineDash([2, 7]); c.lineWidth = 2; c.strokeStyle = WINTER ? 'rgba(255,255,255,.55)' : 'rgba(21,111,110,.45)';
           c.beginPath(); c.moveTo(x, hy + R); c.lineTo(x, oy + ld.y * S - R); c.stroke(); c.setLineDash([4, 4]); c.lineWidth = 1.6;
-          circle(c, x, oy + ld.y * S, R); c.globalAlpha = 0.6; c.stroke(); c.restore();
+          if (ld.sup && ld.sup.lv === lv && Math.abs(G.hx - ld.sup.x) <= SL_TOL) { c.strokeStyle = '#FFD45C'; c.lineWidth = 3; c.setLineDash([]); c.globalAlpha = 0.95; } else c.globalAlpha = 0.6;      // золотое кольцо: «точный бросок»
+          circle(c, x, oy + ld.y * S, R); c.stroke(); c.restore();
           q = G.spr[lv]; R = q.width / dpr;
           c.save(); c.translate(x, y); c.scale(k, k); c.drawImage(q, -R / 2, -R / 2, R, R); c.restore();
           if (G.hint) slHint(c, x, y, SL_R[lv] * S);
