@@ -1324,6 +1324,14 @@ addEventListener('pageshow', function(e){ if (e.persisted) location.reload(); })
 document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
 try { if (window.Telegram && Telegram.WebApp){ Telegram.WebApp.ready(); Telegram.WebApp.expand(); } } catch (e) {}
+/* оболочка зала (Р-1176): маска открыта в iframe зала (в адресе shell=1) — «Все игры» закрывает iframe, а не грузит зал внутрь маски */
+try {
+  if (/[?&]shell=1(?:&|$)/.test(String(location.search || '')) && window.parent && window.parent !== window) {
+    Array.prototype.forEach.call(document.querySelectorAll('a[href="../index.html"]'), function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); try { stopCam(); } catch (x) {} try { window.parent.postMessage({ wdx: 1, t: 'close' }, location.origin); } catch (x) {} });
+    });
+  }
+} catch (e) {}
 
 $('snd').classList.toggle('off', muted);
 updateDots();
