@@ -17,7 +17,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#156F6E">
-<link rel="icon" href="data:,">
+<meta name="description" content="Тапни, когда красная точка печати окажется под трубочкой. Мини-игра WeDrink, Новосибирск.">
+<link rel="icon" type="image/webp" href="../assets/icon-96.webp">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WeDrink">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="WeDrink — Трубочка">
+<meta property="og:description" content="Тапни, когда красная точка печати окажется под трубочкой. Мини-игра WeDrink, Новосибирск.">
+<meta property="og:url" content="https://holopi1.github.io/wedrink-games/trubochka/">
+<meta property="og:image" content="https://holopi1.github.io/wedrink-games/assets/mascot-512.webp">
+<meta property="og:image:type" content="image/webp">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary">
 <title>Трубочка — WeDrink</title>
 <style>
 :root{
@@ -356,17 +369,75 @@ body.winter{background:#0A2233}
 @media (max-height:640px){.wd-mascot{width:72px;height:72px}}
 @media (prefers-reduced-motion:reduce){.wd-mascot,.wd-prize-m::before{animation:none}}
 
-/* ===== Ссылка в зал игр (v5): одна на приложение, видна на стартовом экране и на экране результата ===== */
-.wd-back{display:none;position:absolute;left:6px;top:6px;z-index:30;padding:9px 10px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  color:var(--brand-dark,#156F6E);text-decoration:none;border-radius:999px;-webkit-tap-highlight-color:transparent}
-#app:has(#s-start.is-on) .wd-back,#app:has(#s-result.is-on) .wd-back{display:block}
-.wd-back:hover,.wd-back:focus-visible{text-decoration:underline}
-#app.winter .wd-back,#app[data-season="winter"] .wd-back{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}
+/* ===== v6: общий слой — кнопка «Все игры», настройки, быстрая кнопка звука, касания, безопасные зоны ===== */
+html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+@supports (height:100dvh){html,body{height:100dvh}}
+a,button{-webkit-touch-callout:none}
+.wdx-ibtn{
+  position:absolute;z-index:40;top:calc(env(safe-area-inset-top,0px) + 6px);right:calc(env(safe-area-inset-right,0px) + 8px);
+  display:none;align-items:center;justify-content:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;
+  background:rgba(255,255,255,.94);color:#156F6E;box-shadow:0 2px 10px rgba(0,0,0,.22),inset 0 0 0 1.5px rgba(27,143,142,.35);
+  font:inherit;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;transition:transform .1s;
+}
+.wdx-ibtn svg{width:26px;height:26px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wdx-ibtn:active{transform:scale(.92)}
+.wdx-ibtn:focus-visible,.wdx-row:focus-visible,.wdx-done:focus-visible,.wdx-back:focus-visible{outline:3px solid #DC223C;outline-offset:2px}
+.wdx-gear{display:flex}
+.wdx-snd{top:calc(env(safe-area-inset-top,0px) + 4px);width:42px;height:42px}
+.wdx-snd svg{width:22px;height:22px}
+#app .wdx-gear{display:none}
+#app:has(#s-start.is-on) .wdx-gear,#app:has(#s-result.is-on) .wdx-gear,#app:has(#s-limit.is-on) .wdx-gear{display:flex}
+#app:has(#s-game.is-on) .wdx-snd{display:flex}
+@supports not selector(:has(*)){#app .wdx-gear{display:flex}}
+body > .wdx-ibtn{position:absolute}
+
+.wdx-back{
+  flex:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;max-width:340px;min-height:50px;margin:4px auto 0;padding:12px 18px;
+  border-radius:16px;background:#fff;color:#156F6E;box-shadow:inset 0 0 0 2.5px #1B8F8E,0 3px 0 rgba(21,111,110,.35);
+  font:800 17px/1.1 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;text-decoration:none;text-align:center;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;transition:transform .08s,box-shadow .08s;
+}
+.wdx-back:active{transform:translateY(2px);box-shadow:inset 0 0 0 2.5px #1B8F8E,0 1px 0 rgba(21,111,110,.35)}
+.wdx-back::before{content:"";width:9px;height:9px;border-left:3px solid currentColor;border-bottom:3px solid currentColor;transform:rotate(45deg);margin-right:2px;flex:none}
+
+.wdx-set{position:absolute;top:0;right:0;bottom:0;left:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(8,32,36,.62);animation:wdx-in .18s ease both}
+.wdx-set.wdx-fixed{position:fixed}
+.wdx-set[hidden]{display:none !important}
+.wdx-card{width:100%;max-width:340px;max-height:100%;overflow:auto;padding:20px 18px 18px;border-radius:24px;background:#FFFDF6;color:#1F2A2A;box-shadow:0 18px 50px rgba(0,0,0,.4);animation:wdx-pop .22s cubic-bezier(.2,.9,.3,1.2) both}
+.wdx-card h2{margin:0 0 6px;font:900 24px/1.1 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;letter-spacing:-.02em;color:#156F6E}
+.wdx-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;margin:0;padding:8px 2px;border:0;border-bottom:1px solid #E8DFC4;border-radius:0;background:none;
+  color:#1F2A2A;font:800 18px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;text-align:left;cursor:pointer;touch-action:manipulation;
+}
+.wdx-sw{position:relative;flex:none;width:54px;height:32px;border-radius:16px;background:#B9C6C5;transition:background .15s}
+.wdx-sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .15s}
+.wdx-row[aria-checked="true"] .wdx-sw{background:#1B8F8E}
+.wdx-row[aria-checked="true"] .wdx-sw::after{transform:translateX(22px)}
+.wdx-done{display:block;width:100%;min-height:52px;margin:16px 0 0;padding:12px;border:0;border-radius:16px;background:#DC223C;color:#fff;box-shadow:0 4px 0 #A5192C;
+  font:900 18px/1.1 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;cursor:pointer;touch-action:manipulation}
+.wdx-done:active{transform:translateY(2px);box-shadow:0 2px 0 #A5192C}
+@keyframes wdx-in{from{opacity:0}to{opacity:1}}
+@keyframes wdx-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.wdx-set,.wdx-card{animation:none}.wdx-ibtn,.wdx-back,.wdx-sw,.wdx-sw::after{transition:none}}
+/* v6: стартовый экран помещается в 320×568 вместе с кнопкой «Все игры» */
+@media (max-height:620px){
+  #s-start>*{flex-shrink:0}
+  #s-start{--gap:5px}
+  .hero-wrap{height:clamp(120px,22vh,340px)}
+  .title{font-size:28px}
+  .daily{font-size:13.5px;line-height:1.25}
+  .compo{font-size:11px;line-height:1.25}
+  .stats{padding:5px 10px 4px;gap:3px}.stat-row{font-size:13px}
+  .c7 svg{width:17px;height:22px}
+  .rule{font-size:12px;line-height:1.25}
+  .btn{padding:15px 26px}
+  .wdx-back{min-height:48px;padding:8px 18px;margin-top:0}
+  .meta{font-size:12px;line-height:1.25}
+}
 </style>
 </head>
 <body>
 <div id="app">
-  <a class="wd-back" href="../index.html">← Все игры</a>
 
   <!-- Шапка бренда: общая для всех экранов -->
   <header class="brandbar">
@@ -397,6 +468,7 @@ body.winter{background:#0A2233}
     </div>
     <p class="rule">Тапни, когда красная точка печати окажется под трубочкой. 10&nbsp;стаканов, до&nbsp;300&nbsp;очков.</p>
     <button class="btn" id="btn-play" type="button">Играть</button>
+    <a class="wdx-back" href="../index.html">Все игры</a>
     <p class="meta" id="start-meta"></p>
     <div class="proto" id="start-proto">прототип</div>
   </section>
@@ -425,6 +497,7 @@ body.winter{background:#0A2233}
     <div id="res-ticket"></div>
     <p class="note" id="res-note"></p>
     <button class="btn" id="btn-again" type="button">Ещё раз</button>
+    <a class="wdx-back" href="../index.html">Все игры</a>
     <p class="note" id="res-left"></p>
   </section>
 
@@ -434,6 +507,7 @@ body.winter{background:#0A2233}
     <p class="limit-record" id="limit-record"></p>
     <div id="limit-ticket"></div>
     <p class="note" id="limit-next"></p>
+    <a class="wdx-back" href="../index.html">Все игры</a>
   </section>
   </div>
 
@@ -442,6 +516,304 @@ body.winter{background:#0A2233}
 </div>
 
 <script>
+/* ============================================================================
+   WDX (v6) — общий слой всех игр и зала WeDrink: настройки, музыка, Telegram Mini App.
+   Один и тот же код лежит в зале и в каждой игре (файлы самодостаточны).
+   Профиль wedrink.profile.v1: пишем только поля music и sfx (по умолчанию включено), остальное не трогаем.
+   Музыка: assets/music.mp3 тянется лениво, только после первого касания. Внешних запросов нет,
+   кроме скрипта Telegram и только внутри Telegram.
+   ============================================================================ */
+(function () {
+  'use strict';
+  var PROFILE_KEY = 'wedrink.profile.v1';
+  var MUSIC_FILE = 'assets/music.mp3';
+  var MUSIC_VOL = 0.35;                      // громкость фоновой музыки
+  var TG_SRC = 'https://telegram.org/js/telegram-web-app.js';
+  var TG_FLAG = 'wedrink.tg';
+  var HALL_COLOR = { light: '#FBF7EC', winter: '#0F5059' };
+  var GAME_COLOR = { light: '#FBF7EC', winter: '#0F5059' };
+
+  var cfg = { base: '', hall: false, sfx: false };
+  var cache = {}, ui = {}, audio = null, ctx = null, gain = null;
+  var started = false, suspended = false, lastFocus = null, touched = false;
+  var theme = { winter: false }, tgW = null, tgPending = false, tgLoading = false;
+
+  /* ---------- профиль: читаем целиком, меняем одно поле ---------- */
+  function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
+  function readProfile() {
+    try { var o = JSON.parse(window.localStorage.getItem(PROFILE_KEY)); return isObj(o) ? o : {}; } catch (e) { return {}; }
+  }
+  function pref(name) {
+    if (Object.prototype.hasOwnProperty.call(cache, name)) return cache[name];
+    return readProfile()[name] !== false;     // по умолчанию включено
+  }
+  function setPref(name, on) {
+    var p;
+    cache[name] = !!on;
+    try { p = readProfile(); p[name] = !!on; window.localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* без хранилища — до конца сессии */ }
+  }
+
+  /* ---------- адрес зала (с сохранением ?season=) ---------- */
+  function hallUrl() {
+    var m = null, q = '';
+    try { m = /[?&]season=(winter|default)(?:&|$)/.exec(String(window.location.search || '')); } catch (e) { m = null; }
+    if (m && !cfg.hall) q = '?season=' + m[1];
+    return cfg.base + 'index.html' + q;
+  }
+  function goHall() { try { window.location.href = hallUrl(); } catch (e) { /* адрес недоступен */ } }
+
+  /* ---------- музыка ---------- */
+  function savePos() {
+    try { if (audio && audio.currentTime > 0) window.sessionStorage.setItem('wedrink.mt', JSON.stringify({ t: audio.currentTime, ts: Date.now() })); } catch (e) { /* нет sessionStorage */ }
+  }
+  function ensureAudio() {
+    var a, saved = null, AC;
+    if (audio) return audio;
+    try {
+      a = new Audio();
+      a.loop = true; a.preload = 'auto'; a.volume = MUSIC_VOL;
+      a.setAttribute('playsinline', ''); a.setAttribute('aria-hidden', 'true');
+      try { saved = JSON.parse(window.sessionStorage.getItem('wedrink.mt')); } catch (e) { saved = null; }
+      if (saved && isFinite(saved.t) && Date.now() - saved.ts < 20000) {
+        a.addEventListener('loadedmetadata', function () {          // переход зал ↔ игра: музыка продолжается с того же места
+          try { if (a.duration > 1) a.currentTime = saved.t % a.duration; } catch (e) { /* не страшно */ }
+        }, { once: true });
+      }
+      a.src = cfg.base + MUSIC_FILE;
+      AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && /^https?:$/.test(String(window.location.protocol))) {      // iOS не слушает audio.volume — громкость ставим через усилитель
+        try {
+          ctx = new AC();
+          gain = ctx.createGain(); gain.gain.value = MUSIC_VOL;
+          ctx.createMediaElementSource(a).connect(gain);
+          gain.connect(ctx.destination);
+          a.volume = 1;
+        } catch (e) { ctx = null; gain = null; a.volume = MUSIC_VOL; }
+      }
+      audio = a;
+    } catch (e) { audio = null; }
+    return audio;
+  }
+  function play() {
+    var a, p;
+    if (!pref('music') || document.hidden) return;
+    a = ensureAudio();
+    if (!a) return;
+    try { if (ctx && ctx.state === 'suspended') ctx.resume(); } catch (e) { /* не страшно */ }
+    try {
+      p = a.play();
+      if (p && p.then) p.then(function () { started = true; suspended = false; }, function () { /* ждём следующего касания */ });
+      else { started = true; suspended = false; }
+    } catch (e) { /* ждём следующего касания */ }
+  }
+  function stop() {
+    started = false; suspended = false;
+    try { if (audio) audio.pause(); } catch (e) { /* не страшно */ }
+  }
+  function onUnlock() {                       // браузеры не пускают звук без касания: первое касание запускает музыку
+    touched = true;
+    if (!started && pref('music')) play();
+  }
+  function onHide() {
+    if (audio && !audio.paused) { savePos(); suspended = true; try { audio.pause(); } catch (e) { /* не страшно */ } }
+  }
+  function onShow() {
+    if (suspended && pref('music')) play();
+    suspended = false;
+  }
+
+  /* ---------- Telegram Mini App ---------- */
+  function inTelegram() {
+    var s = '';
+    try { if (window.TelegramWebviewProxy) return true; } catch (e) { /* нет */ }
+    try { s = String(window.location.hash || '') + '&' + String(window.location.search || ''); } catch (e) { s = ''; }
+    if (/tgWebAppData=|tgWebAppVersion=/.test(s)) return true;
+    try { if (window.sessionStorage.getItem(TG_FLAG) === '1') return true; } catch (e) { /* нет sessionStorage */ }
+    return false;
+  }
+  function tgVer(v) { try { return !!(tgW && typeof tgW.isVersionAtLeast === 'function' && tgW.isVersionAtLeast(v)); } catch (e) { return false; } }
+  function tgCall(name, a) { try { if (tgW && typeof tgW[name] === 'function') tgW[name](a); } catch (e) { /* старый клиент */ } }
+  function tgColor() { return theme.winter ? (cfg.hall ? HALL_COLOR.winter : GAME_COLOR.winter) : (cfg.hall ? HALL_COLOR.light : GAME_COLOR.light); }
+  function tgApply() {
+    var c = tgColor();
+    if (!tgW) return;
+    tgCall('ready'); tgCall('expand');
+    if (tgVer('7.7')) tgCall('disableVerticalSwipes');
+    if (tgVer('6.1')) { tgCall('setBackgroundColor', c); }
+    if (tgVer('6.9')) { tgCall('setHeaderColor', c); tgCall('setBottomBarColor', c); }
+    try {
+      if (tgVer('6.1') && tgW.BackButton) {
+        tgW.BackButton.offClick(goHall);
+        if (cfg.hall) tgW.BackButton.hide();
+        else { tgW.BackButton.onClick(goHall); tgW.BackButton.show(); }
+      }
+    } catch (e) { /* старый клиент */ }
+  }
+  function tgLoad() {
+    var s;
+    if (tgLoading || tgW) return;
+    tgLoading = true;
+    try { window.sessionStorage.setItem(TG_FLAG, '1'); } catch (e) { /* нет sessionStorage */ }
+    try {
+      s = document.createElement('script');
+      s.src = TG_SRC; s.async = true;
+      s.onload = function () { try { tgW = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null; } catch (e) { tgW = null; } tgApply(); };
+      s.onerror = function () { tgLoading = false; };
+      document.head.appendChild(s);
+    } catch (e) { tgLoading = false; }
+  }
+  var HAPTIC_IMPACT = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1 };
+  function haptic(kind) {                     // kind: light | medium | heavy | success | warning | error | select
+    var h;
+    try {
+      h = tgW && tgVer('6.1') ? tgW.HapticFeedback : null;
+      if (!h) return false;
+      if (kind === 'success' || kind === 'warning' || kind === 'error') h.notificationOccurred(kind);
+      else if (kind === 'select') h.selectionChanged();
+      else h.impactOccurred(HAPTIC_IMPACT[kind] ? kind : 'light');
+      return true;
+    } catch (e) { return false; }
+  }
+  function buzz(p) {                          // замена navigator.vibrate: в Telegram — HapticFeedback, иначе обычная вибрация
+    var k;
+    if (tgW) {
+      if (typeof p === 'number') k = p <= 12 ? 'light' : (p <= 22 ? 'medium' : 'heavy');
+      else if (p && p.length >= 5) k = 'success';
+      else if (p && p.length === 3 && p[0] >= 28) k = 'error';
+      else k = 'medium';
+      if (haptic(k)) return;
+    }
+    if (!touched) return;                     // до первого касания браузер блокирует вибрацию и пишет ошибку в консоль
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* вибрации нет */ }
+  }
+
+  /* ---------- тема: цвет адресной строки и шапки Telegram ---------- */
+  function setTheme(winter) {
+    var m;
+    theme.winter = !!winter;
+    try {
+      m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', tgColor());
+    } catch (e) { /* не страшно */ }
+    if (tgW) tgApply();
+  }
+
+  /* ---------- интерфейс настроек ---------- */
+  var ICON_GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>';
+  var ICON_ON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.6L12 5.6v12.8l-4.4-3.9H4z"/><path d="M15.4 9a4.2 4.2 0 0 1 0 6M17.9 6.6a7.6 7.6 0 0 1 0 10.8"/></svg>';
+  var ICON_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.6L12 5.6v12.8l-4.4-3.9H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
+
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; }   // html — только свои константы
+
+  function syncUi() {
+    var on = pref('music'), i, rows = ui.rows || [];
+    if (ui.snd) {
+      ui.snd.innerHTML = on ? ICON_ON : ICON_OFF;
+      ui.snd.setAttribute('aria-pressed', on ? 'true' : 'false');
+      ui.snd.setAttribute('aria-label', on ? 'Музыка включена. Выключить' : 'Музыка выключена. Включить');
+    }
+    for (i = 0; i < rows.length; i++) rows[i].setAttribute('aria-checked', pref(rows[i].getAttribute('data-k')) ? 'true' : 'false');
+  }
+  function toggle(name) {
+    var on = !pref(name);
+    setPref(name, on);
+    if (name === 'music') { if (on) play(); else stop(); }
+    haptic('select');
+    syncUi();
+  }
+  function openSettings() {
+    if (!ui.dlg) return;
+    lastFocus = document.activeElement;
+    ui.dlg.hidden = false;
+    syncUi();
+    try { ui.rows[0].focus(); } catch (e) { /* не страшно */ }
+  }
+  function closeSettings() {
+    if (!ui.dlg || ui.dlg.hidden) return;
+    ui.dlg.hidden = true;
+    try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (e) { /* не страшно */ }
+  }
+  function buildUi(host) {
+    var gear, snd, dlg, card, row, rows = [], done, defs = [{ k: 'music', t: 'Музыка' }], i;
+    if (cfg.sfx) defs.push({ k: 'sfx', t: 'Звуки' });
+    gear = el('button', 'wdx-ibtn wdx-gear', ICON_GEAR);
+    gear.type = 'button'; gear.setAttribute('aria-label', 'Настройки');
+    gear.addEventListener('click', openSettings);
+    host.appendChild(gear);
+    if (!cfg.hall) {
+      snd = el('button', 'wdx-ibtn wdx-snd');
+      snd.type = 'button';
+      snd.addEventListener('click', function () { toggle('music'); });
+      host.appendChild(snd);
+    }
+    dlg = el('div', 'wdx-set' + (cfg.hall ? ' wdx-fixed' : ''));
+    dlg.hidden = true;
+    card = el('div', 'wdx-card');
+    card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', 'wdx-title');
+    card.appendChild(el('h2', '', 'Настройки')).id = 'wdx-title';
+    for (i = 0; i < defs.length; i++) {
+      row = el('button', 'wdx-row', '<span>' + defs[i].t + '</span><i class="wdx-sw" aria-hidden="true"></i>');
+      row.type = 'button'; row.setAttribute('role', 'switch'); row.setAttribute('data-k', defs[i].k);
+      (function (k) { row.addEventListener('click', function () { toggle(k); }); })(defs[i].k);
+      card.appendChild(row); rows.push(row);
+    }
+    done = el('button', 'wdx-done', 'Готово');
+    done.type = 'button';
+    done.addEventListener('click', closeSettings);
+    card.appendChild(done);
+    dlg.appendChild(card);
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) closeSettings(); });
+    dlg.addEventListener('keydown', function (e) {                    // Escape закрывает, Tab крутится внутри окна
+      var items, first, last;
+      if (e.key === 'Escape' || e.keyCode === 27) { e.preventDefault(); closeSettings(); return; }
+      if (e.key === 'Tab' || e.keyCode === 9) {
+        items = card.querySelectorAll('button'); first = items[0]; last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    });
+    host.appendChild(dlg);
+    ui = { gear: gear, snd: snd, dlg: dlg, rows: rows };
+    syncUi();
+  }
+
+  /* ---------- параметр ?preview=N: экран приза без игры, слово всегда «ПРИМЕР» ---------- */
+  function previewScore() {
+    var m = null, n;
+    try { m = /[?&]preview=(\d{1,3})(?:&|$)/.exec(String(window.location.search || '')); } catch (e) { m = null; }
+    if (!m) return null;
+    n = parseInt(m[1], 10);
+    return isFinite(n) ? Math.max(0, Math.min(300, n)) : null;
+  }
+
+  /* ---------- запуск ---------- */
+  function init(opts) {
+    var host, i, links;
+    opts = opts || {};
+    cfg.base = opts.base || ''; cfg.hall = !!opts.hall; cfg.sfx = !!opts.sfx;
+    host = cfg.hall ? document.body : (document.getElementById('app') || document.body);
+    try { buildUi(host); } catch (e) { /* без настроек игра всё равно работает */ }
+    links = document.querySelectorAll('.wdx-back');
+    for (i = 0; i < links.length; i++) links[i].setAttribute('href', hallUrl());
+    if (!cfg.hall) {
+      try { host.addEventListener('contextmenu', function (e) { e.preventDefault(); }); } catch (e) { /* не страшно */ }
+    }
+    ['pointerdown', 'touchend', 'keydown', 'click'].forEach(function (t) { document.addEventListener(t, onUnlock, true); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) onHide(); else onShow(); });
+    window.addEventListener('pagehide', onHide);
+    window.addEventListener('pageshow', function (e) { if (e && e.persisted) onShow(); });
+    window.addEventListener('storage', function (e) {                 // выбор из другой вкладки
+      if (e && e.key === PROFILE_KEY) { cache = {}; syncUi(); if (!pref('music')) stop(); }
+    });
+    if (inTelegram()) tgLoad();
+  }
+
+  window.WDX = {
+    init: init, theme: setTheme, buzz: buzz, haptic: haptic, previewScore: previewScore,
+    pref: pref, openSettings: openSettings, goHall: goHall, inTelegram: inTelegram,
+    PREVIEW_WORD: 'ПРИМЕР'
+  };
+})();
 (function () {
   'use strict';
 
@@ -469,7 +841,7 @@ function refreshTicketWords() {   // билет мог быть показан �
     w = ws[i]; a = w.getAttribute('data-wk') === 'drink' ? WORDS_DRINK : WORDS_TOPPING; d = parseInt(w.getAttribute('data-dow'), 10);
     if (a[d]) w.textContent = a[d];
   }
-  if (!IS_PROTOTYPE) { tags = document.querySelectorAll('.ticket-tag'); for (i = 0; i < tags.length; i++) tags[i].style.display = "none"; }
+  if (!IS_PROTOTYPE) { tags = document.querySelectorAll('.ticket-tag:not([data-pv])'); for (i = 0; i < tags.length; i++) tags[i].style.display = "none"; }
 }
 function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el.startProto.hidden = !IS_PROTOTYPE; } catch (e) { /* элемент ещё не готов */ } }
 (function loadWeekWords() {
@@ -904,6 +1276,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
   }
   function stopStamp() { if (stampTimer) { clearInterval(stampTimer); stampTimer = null; } }
   // Билет приза. Слово дня — из WORDS_TOPPING / WORDS_DRINK по дню недели; цен и условий здесь нет.
+  var PREVIEW = false;               // ?preview=N: экран приза без игры, слово всегда «ПРИМЕР», ничего не пишется
   function putTicket(box, score) {
     var drink = score >= PRIZE_DRINK, words = drink ? WORDS_DRINK : WORDS_TOPPING, stamp;
     stopStamp();
@@ -912,13 +1285,13 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
       '<svg class="ticket-bow" viewBox="0 0 56 40" aria-hidden="true"><path d="M28 20 C18 4 4 4 5 18 C5 30 18 30 28 20 Z"/>' +
       '<path d="M28 20 C38 4 52 4 51 18 C51 30 38 30 28 20 Z"/><path d="M25 22 L17 38 L24 34 L28 39 L32 34 L39 38 L31 22 Z"/>' +
       '<circle cx="28" cy="20" r="5.5"/></svg>' +
-      '<div class="ticket-top">' + (IS_PROTOTYPE ? '<div class="ticket-tag">прототип</div>' : '') + '<div class="ticket-head">' + (drink ? 'Напиток в&nbsp;подарок' : 'Топпинг в&nbsp;подарок') + '</div>' +
+      '<div class="ticket-top">' + (PREVIEW ? '<div class="ticket-tag" data-pv="1">просмотр</div>' : (IS_PROTOTYPE ? '<div class="ticket-tag">прототип</div>' : '')) + '<div class="ticket-head">' + (drink ? 'Напиток в&nbsp;подарок' : 'Топпинг в&nbsp;подарок') + '</div>' +
       '<div class="ticket-line">' + (drink ? 'К&nbsp;любой покупке' : 'К&nbsp;любому напитку') + '</div></div>' +
       '<div class="ticket-body"><div class="ticket-how">На&nbsp;кассе назови номер телефона и&nbsp;слово дня</div>' +
-      '<div class="ticket-word" data-wk="' + (drink ? 'drink' : 'topping') + '" data-dow="' + NOW.dow + '"></div>' +
+      '<div class="ticket-word"' + (PREVIEW ? '' : ' data-wk="' + (drink ? 'drink' : 'topping') + '" data-dow="' + NOW.dow + '"') + '></div>' +
       '<div class="ticket-one">Один приз в&nbsp;день на&nbsp;гостя</div>' +
       '<div class="ticket-stamp"></div></div></div>';
-    box.querySelector('.ticket-word').textContent = words[NOW.dow] || words[0];
+    box.querySelector('.ticket-word').textContent = PREVIEW ? WDX.PREVIEW_WORD : (words[NOW.dow] || words[0]);   // просмотр никогда не показывает настоящее слово
     stamp = box.querySelector('.ticket-stamp');
     stamp.textContent = stampText();
     stampTimer = setInterval(function () { stamp.textContent = stampText(); }, 1000);   // секунды идут
@@ -2135,6 +2508,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
   function gnow() { return pnow() - pausedTotal; }               // игровое время, мс (паузы вкладки вычтены)
 
   function startGame() {
+    PREVIEW = false;
     refreshDay();
     var day = loadDay(), attemptNo, gn;
     if (store.ok && day.used >= ATTEMPTS_PER_DAY) { showLimit(day); return; }
@@ -2194,8 +2568,8 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
     el.combo.textContent = 'серия ×' + G.combo;
     el.combo.classList.toggle('on', G.combo >= 2);
     if (h.score > 0) { el.hTotal.classList.remove('bump'); void el.hTotal.offsetWidth; el.hTotal.classList.add('bump'); }
-    if (h.score >= NEAR_SCORE && navigator.vibrate) {               // вибрация — только на удачных ударах
-      try { navigator.vibrate(h.score === CUP_MAX ? [18, 40, 28] : 16); } catch (e) { /* нет доступа */ }
+    if (h.score >= NEAR_SCORE) {               // вибрация — только на удачных ударах
+      try { WDX.buzz(h.score === CUP_MAX ? [18, 40, 28] : 16); } catch (e) { /* нет доступа */ }
     }
   }
   function nextCup(gn) {
@@ -2384,7 +2758,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
     var now = pnow(), dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000)), gn, busy = false;
     raf = 0;
     lastFrame = now;
-    if (hiddenAt !== null) { raf = requestAnimationFrame(frame); return; }
+    if (hiddenAt !== null) return;                        // вкладка скрыта — цикл стоит, startLoop() вернёт его по visibilitychange
     gn = now - pausedTotal;
     if (needLayout) { needLayout = false; relayout(); }
     par.x += (par.tx - par.x) * Math.min(1, dt * 5);
@@ -2468,8 +2842,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
   /* =====================================================================
      12. ЗАПУСК
      ===================================================================== */
-  // Заготовка под Telegram Mini App (без внешних скриптов)
-  if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+  try { WDX.init({ base: '../' }); WDX.theme(WINTER); } catch (e) { /* общий слой не критичен */ }
 
   el.hint.textContent = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
     ? 'Тапни, когда красная точка под трубочкой'
@@ -2481,8 +2854,21 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
   } catch (e) { didReset = false; }
 
   fxLayout();
-  showStart();
-  if (didReset) toast('Счётчик попыток сброшен');
+  var pvScore = null;
+  try { pvScore = WDX.previewScore(); } catch (e) { pvScore = null; }
+  if (pvScore !== null) {
+    // Просмотр экрана результата: ничего не сохраняет, попытку не тратит, слово дня — «ПРИМЕР»
+    PREVIEW = true;
+    (function () {
+      var left = pvScore, sc = [], k, v;
+      for (k = 0; k < CUPS; k++) { v = Math.min(CUP_MAX, left); sc.push(v); left -= v; }
+      showResult({ total: pvScore, scores: sc }, { used: 0, best: 0 });
+    })();
+    toast('Просмотр экрана: ничего не сохраняется');
+  } else {
+    showStart();
+    if (didReset) toast('Счётчик попыток сброшен');
+  }
 })();
 </script>
 </body>
