@@ -1,0 +1,2559 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<!--
+  «Налей до черты» — мини-игра WeDrink (Новосибирск), прототип по общему стандарту (SPEC.md: v2 + дополнения v3 и v4, 2026-11-16).
+  Один файл: HTML + CSS + JS, без внешних библиотек, шрифтов, картинок и запросов в сеть.
+
+  ПАЛИТРА. Фирменные цвета — из SPEC.md (аудит бренда и исходники постеров; брендбука нет):
+    brand #1B8F8E, brand-dark #156F6E, accent #DC223C, bg #FBF7EC, ink #1F2A2A.
+  Цвета напитков подобраны правдоподобно под игру, по техкартам не сверялись.
+  Составы слоёв — по описаниям позиций в меню (wedrink-tools/cards/menu_data.py).
+  Все цвета меняются в одном месте — в :root ниже; canvas читает их оттуда же.
+
+  СЕЗОН. Зимний вид включается сам с 15 ноября по 28 февраля; для проверки: ?season=winter или ?season=default.
+  Проверка попыток: ?reset=1 в адресе обнуляет счётчик попыток за сегодня.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#156F6E">
+<link rel="icon" href="data:,">
+<title>WeDrink — Налей до черты</title>
+<style>
+:root{
+  /* --- фирменные цвета WeDrink (SPEC) --- */
+  --brand:#1B8F8E;
+  --brand-dark:#156F6E;
+  --accent:#DC223C;
+  --bg:#FBF7EC;
+  --ink:#1F2A2A;
+  /* --- вспомогательные (исходники постеров) --- */
+  --card:#FFFDF6;
+  --muted:#3E4E50;
+  --soft:#DDEDEA;
+  --soft-2:#CFE9E6;
+  --line:#E8DFC4;
+  --sun:#FFD45C;
+  --mint:#8FE3DC;       /* светлая бирюза: огни и текст на тёмном */
+  /* --- цвета напитков: у каждой жидкости верх и низ градиента --- */
+  --tea-top:#E09A45;    --tea-bot:#B8621F;     /* чёрный чай */
+  --light-top:#F5D67E;  --light-bot:#DDAA3E;   /* жасминовый чай */
+  --rose-top:#F59C90;   --rose-bot:#DB5F66;    /* жасминовый чай, клубничный вкус */
+  --choco-top:#9A6642;  --choco-bot:#5F3A22;   /* шоколадный чай */
+  --milk-top:#FFFAF0;   --milk-bot:#F1E2C8;    /* молочная основа */
+  --coco-top:#FFFFFF;   --coco-bot:#EFEADF;    /* кокосовое молоко */
+  --grape-top:#A77BCB;  --grape-bot:#6A3B97;   /* виноградный джем */
+  --foam-top:#FFF4C4;   --foam-bot:#FFE08C;    /* сырная пенка */
+  /* --- топпинги и добавки --- */
+  --pearl:#3B2519;      --pearl-hi:#7A5136;    /* жемчужная тапиока */
+  --bean:#8E2F2A;       --bean-hi:#C2584C;     /* красная фасоль */
+  --jelly:#FFBE85;      --jelly-edge:#F0955A;  /* персиковое желе */
+  --ice:#F4FBFF;        --ice-edge:#A6D0DC;    /* лёд */
+  --lemon:#FFE873;      --lemon-edge:#E9B81F;  /* лимон */
+  --oreo:#2B201C;       --oreo-cream:#F4EDE0;  /* Oreo */
+  --glass:#FFFFFF;      /* стекло и блики */
+  /* --- зима (SEASON = 'winter') --- */
+  --night-1:#0F5059;    --night-2:#10405E;    --night-3:#142C52;   /* вечернее небо: тёмная бирюза — синий */
+  --warm-1:#FFE9A8;     --warm-2:#FFBE63;     --warm-3:#F0934A;    /* тёплый свет окна */
+  --snow:#FFFFFF;       --snow-shade:#C9E2EE;
+  /* --- текст поверх фона приложения (зимой фон тёмный) --- */
+  --on-bg:var(--ink);
+  --on-bg-muted:var(--muted);
+  --on-bg-brand:var(--brand-dark);
+  --mark:var(--brand);
+  --star:var(--accent);
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{
+  font-family:var(--font);color:var(--ink);background:var(--brand-dark);
+  overflow:hidden;overscroll-behavior:none;touch-action:manipulation;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
+}
+#app{
+  position:fixed;top:0;right:0;bottom:0;left:0;margin:auto;
+  width:100%;max-width:460px;height:100%;max-height:920px;
+  background:
+    radial-gradient(120% 55% at 50% 0%,rgba(255,255,255,.9) 0%,rgba(255,255,255,0) 62%),
+    linear-gradient(180deg,var(--bg) 0%,#EFF6EE 58%,var(--soft) 100%);
+  display:flex;flex-direction:column;overflow:hidden;color:var(--on-bg);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+}
+#app.winter{
+  --on-bg:#F4FBFA;--on-bg-muted:#C9E0E3;--on-bg-brand:var(--sun);--mark:#FFFFFF;--star:var(--sun);
+  background:linear-gradient(180deg,var(--night-1) 0%,var(--night-2) 55%,var(--night-3) 100%);
+}
+@media (min-width:520px) and (min-height:640px){
+  #app{height:calc(100% - 40px);border-radius:28px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+}
+
+/* фон: едва заметный узор из шариков тапиоки, чуть сдвигается за пальцем (--px, --py ставит скрипт) */
+#app::before{
+  content:"";position:absolute;top:-20px;right:-20px;bottom:-20px;left:-20px;pointer-events:none;z-index:0;
+  background-image:
+    radial-gradient(circle,rgba(31,42,42,.05) 0,rgba(31,42,42,.05) 5px,transparent 6px),
+    radial-gradient(circle,rgba(27,143,142,.08) 0,rgba(27,143,142,.08) 3px,transparent 4px);
+  background-size:84px 96px,84px 96px;background-position:0 0,42px 48px;
+  transform:translate3d(var(--px,0px),var(--py,0px),0);
+}
+/* зима: вместо узора — огни гирлянды под верхним краем */
+#app.winter::before{
+  top:0;right:0;bottom:0;left:0;transform:none;background-size:auto;background-position:0 0;
+  background-image:
+    radial-gradient(circle at 7% 22px,rgba(255,212,92,.95) 0,rgba(255,212,92,.42) 7px,rgba(255,212,92,0) 30px),
+    radial-gradient(circle at 23% 37px,rgba(240,70,95,.95) 0,rgba(240,70,95,.42) 7px,rgba(240,70,95,0) 30px),
+    radial-gradient(circle at 40% 46px,rgba(143,227,220,.95) 0,rgba(143,227,220,.42) 7px,rgba(143,227,220,0) 30px),
+    radial-gradient(circle at 60% 46px,rgba(255,255,255,.95) 0,rgba(255,255,255,.42) 7px,rgba(255,255,255,0) 30px),
+    radial-gradient(circle at 77% 37px,rgba(255,212,92,.95) 0,rgba(255,212,92,.42) 7px,rgba(255,212,92,0) 30px),
+    radial-gradient(circle at 93% 22px,rgba(240,70,95,.95) 0,rgba(240,70,95,.42) 7px,rgba(240,70,95,0) 30px);
+  background-repeat:no-repeat;opacity:.75;animation:twinkle 3.4s ease-in-out infinite;
+}
+#app.winter.party::before{opacity:1;animation-duration:1.1s}
+@keyframes twinkle{0%,100%{opacity:.6}50%{opacity:.95}}
+
+/* шапка бренда — одна на все экраны */
+.wd{position:relative;z-index:1;flex:0 0 auto;text-align:center;padding:12px 16px 4px;line-height:1}
+.wd-mark{display:inline-flex;align-items:flex-start;gap:3px;font:900 34px/1 var(--font);letter-spacing:-.03em;color:var(--mark)}
+#app.winter .wd-mark{text-shadow:0 2px 14px rgba(143,227,220,.4)}
+.wd-flake{display:none;width:14px;height:14px;margin-top:1px;fill:none;stroke:var(--mint);stroke-width:1.6;stroke-linecap:round}
+#app.winter .wd-flake{display:block;animation:spin 16s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wd-city{margin-top:4px;font:700 11px/1 var(--font);letter-spacing:.2em;text-transform:uppercase;color:var(--on-bg-muted)}
+.wd-tag{display:none;margin-top:8px;font:800 12px/1 var(--font);letter-spacing:.05em;color:var(--on-bg-brand)}
+#app.is-start .wd-tag{display:block}
+#app.is-game .wd{padding:8px 16px 0}
+#app.is-game .wd-mark{font-size:23px}
+#app.is-game .wd-flake{width:10px;height:10px}
+#app.is-game .wd-city{font-size:9px;margin-top:2px}
+@media (max-height:600px){.wd{padding-top:8px}.wd-mark{font-size:27px}.wd-tag{margin-top:6px}}
+
+/* экраны: плавное появление и уход */
+.screens{position:relative;z-index:1;flex:1;min-height:0;display:flex}
+.screen{display:none;flex:1;min-width:0;min-height:0;flex-direction:column}
+.screen.is-on{display:flex;animation:scr-in .36s cubic-bezier(.2,.9,.3,1) both}
+.screen.is-leaving{display:flex;position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;animation:scr-out .22s ease both}
+@keyframes scr-in{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes scr-out{from{opacity:1}to{opacity:0;transform:translateY(-10px) scale(.985)}}
+.screen.scroll{overflow-y:auto;touch-action:pan-y}
+
+/* кнопки */
+.btn{
+  -webkit-appearance:none;appearance:none;border:0;border-radius:999px;cursor:pointer;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,#F0445C 0%,var(--accent) 60%,#C41A33 100%);color:#fff;
+  font:900 20px/1 var(--font);letter-spacing:.01em;padding:17px 30px;min-width:220px;
+  box-shadow:0 6px 0 rgba(31,42,42,.22),0 12px 22px rgba(220,34,60,.3),inset 0 2px 0 rgba(255,255,255,.3);
+  touch-action:manipulation;transition:transform .12s cubic-bezier(.3,1.6,.5,1),box-shadow .12s;
+}
+.btn::after{
+  content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;pointer-events:none;
+  background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.35),rgba(255,255,255,0));
+  animation:shine 3.6s ease-in-out infinite;
+}
+@keyframes shine{0%,60%{left:-60%}100%{left:130%}}
+.btn:active{transform:translateY(4px) scale(.97);box-shadow:0 2px 0 rgba(31,42,42,.22),0 4px 10px rgba(220,34,60,.25),inset 0 2px 0 rgba(255,255,255,.3)}
+.btn:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
+.btn.ghost{
+  background:rgba(255,255,255,.14);color:var(--on-bg-brand);padding:13px 22px;font-size:16px;font-weight:800;
+  box-shadow:inset 0 0 0 2px var(--brand);
+}
+#app.winter .btn.ghost{color:#fff;box-shadow:inset 0 0 0 2px var(--mint)}
+.btn.ghost::after{display:none}
+.btn-row{display:flex;gap:8px;width:100%;max-width:340px;justify-content:center}
+.btn-row .btn{flex:1;min-width:0;padding-left:8px;padding-right:8px}
+.btn-row .btn[hidden] + .btn{flex:0 1 220px}
+
+/* старт */
+#s-start{align-items:center;text-align:center;padding:4px 20px 12px;gap:9px}
+#s-start > :first-child{margin-top:auto}
+#s-start > :last-child{margin-bottom:auto}
+.hero-row{display:flex;align-items:flex-end;justify-content:center;gap:10px}
+.hero{height:22vh;max-height:190px;min-height:100px;width:auto;display:block;overflow:visible;animation:bob 4.2s ease-in-out infinite;filter:drop-shadow(0 10px 12px rgba(31,42,42,.2))}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-6px) rotate(1.2deg)}}
+.h-pearl{fill:var(--pearl)}
+.h-outline{fill:none;stroke:#fff;stroke-width:2.4;stroke-linejoin:round;opacity:.95}
+.h-edge{fill:none;stroke:var(--ink);stroke-width:5;stroke-linejoin:round;opacity:.14}
+.h-film{fill:var(--brand)}
+.h-film-shine{fill:var(--glass);opacity:.4}
+.h-logo{font:900 11px var(--font);fill:var(--brand-dark);stroke:var(--glass);stroke-width:2.6px;paint-order:stroke;stroke-linejoin:round}
+.h-mark{stroke:var(--accent);stroke-width:3;stroke-dasharray:7 5;stroke-linecap:round}
+.h-winter{display:none}
+#app.winter .h-winter{display:block}
+.h-steam{display:none;fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;opacity:0}
+#app.winter.is-hot .h-steam{display:block;animation:steam 3s ease-in-out infinite}
+#app.winter.is-hot .h-steam.s2{animation-delay:1.1s}
+#app.winter.is-hot .h-steam.s3{animation-delay:2s}
+@keyframes steam{0%{opacity:0;transform:translateY(8px)}35%{opacity:.5}100%{opacity:0;transform:translateY(-16px)}}
+.title{font-size:32px;line-height:1.05;font-weight:900;letter-spacing:-.02em}
+.title span{border-bottom:4px dashed var(--accent);padding-bottom:1px}
+.daily{font-size:15px;line-height:1.3;color:var(--on-bg-muted);max-width:330px}
+.daily b{color:var(--on-bg-brand);font-weight:900}
+.stars{color:var(--star);letter-spacing:.06em;white-space:nowrap}
+.rule{font-size:14px;line-height:1.35;color:var(--on-bg-muted);max-width:330px}
+.meta{font-size:13px;line-height:1.45;color:var(--on-bg-muted)}
+.proto{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-bg-brand);opacity:.8}
+@media (max-width:340px){.title{font-size:27px}}
+@media (max-height:600px){
+  #s-start{gap:7px}
+  .hero{height:17vh;min-height:88px}
+  .btn{padding:14px 26px}
+  .rule{font-size:13px}
+}
+
+/* профиль: серия и коллекция */
+.profile{width:100%;max-width:340px;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:16px;padding:8px 10px;box-shadow:0 6px 16px rgba(31,42,42,.08)}
+.p-line{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:800;white-space:nowrap}
+.cups{display:flex;justify-content:space-between;margin-top:6px}
+.cup{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px}
+.cup svg{width:26px;height:26px;display:block}
+.cup circle{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.cup path{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linejoin:round;opacity:.5}
+.cup rect{fill:var(--muted);opacity:.35}
+.cup.is-got circle{fill:var(--brand);stroke:var(--brand-dark)}
+.cup.is-got path{fill:#fff;stroke:#fff;opacity:1}
+.cup.is-got rect{fill:#fff;opacity:1}
+.cup.is-today circle{stroke:var(--accent);stroke-width:2}
+.cup i{font-style:normal;font-size:10px;font-weight:700;color:var(--muted)}
+.cup.is-today i{color:var(--accent);font-weight:900}
+
+/* игра */
+.hud{display:flex;gap:6px;padding:8px 12px 8px}
+.chip{
+  flex:1;min-width:0;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:14px;
+  padding:6px 2px 7px;text-align:center;transition:border-color .2s,background .2s,transform .25s cubic-bezier(.3,1.7,.5,1);
+}
+.chip i{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip b{display:block;font-size:19px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+.chip.is-now{border-color:var(--accent);transform:translateY(-2px)}
+.chip.is-now i{color:var(--accent)}
+.chip.is-done{background:var(--soft);border-color:var(--soft-2)}
+.chip.bump{animation:bump .4s cubic-bezier(.3,1.7,.5,1)}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+.chip.total{background:var(--brand-dark);border-color:var(--brand-dark)}
+.chip.total i{color:rgba(255,255,255,.75)}
+.chip.total b{color:#fff}
+.stage{
+  position:relative;flex:1;min-height:0;margin:0 12px;border-radius:24px;overflow:hidden;
+  background:linear-gradient(180deg,var(--soft),var(--soft-2));
+  box-shadow:inset 0 0 0 1px rgba(31,42,42,.06);
+  touch-action:none;cursor:pointer;
+}
+#app.winter .stage{background:linear-gradient(180deg,var(--night-1),var(--night-3));box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+#cv{position:absolute;top:0;left:0;width:100%;height:100%;display:block;touch-action:none}
+.caption,.pop{
+  position:absolute;left:50%;top:10px;z-index:2;pointer-events:none;text-align:center;
+  width:max-content;max-width:calc(100% - 24px);color:var(--ink);
+  background:var(--card);border-radius:18px;padding:9px 16px 10px;box-shadow:0 8px 22px rgba(31,42,42,.2);
+  opacity:0;transform:translate(-50%,-8px) scale(.92);transition:opacity .18s,transform .18s;
+}
+.caption.on{opacity:1;transform:translate(-50%,0) scale(1);transition:opacity .2s,transform .34s cubic-bezier(.3,1.6,.5,1)}
+.caption small{display:block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--brand)}
+.caption strong{display:block;font-size:19px;font-weight:900;line-height:1.15}
+.pop b{display:block;font-size:34px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;color:var(--brand-dark)}
+.pop span{display:block;font-size:14px;font-weight:800;margin-top:3px}
+.pop.on{opacity:1;animation:pop .42s cubic-bezier(.2,1.6,.4,1) both}
+.pop.perfect{background:linear-gradient(180deg,#FFE58F,var(--sun));box-shadow:0 8px 26px rgba(255,212,92,.6)}
+.pop.perfect b{color:var(--ink)}
+.pop.bad b{color:var(--accent)}
+@keyframes pop{from{transform:translate(-50%,-8px) scale(.5)}to{transform:translate(-50%,0) scale(1)}}
+.hint{height:50px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:var(--on-bg-brand)}
+.hint.pulse{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@media (max-width:340px){.caption strong{font-size:17px}}
+
+/* результат и лимит */
+#s-result,#s-limit{align-items:center;text-align:center;padding:8px 18px 14px}
+#s-result{justify-content:flex-start;gap:8px}
+#s-limit{justify-content:flex-start;gap:12px}
+#s-limit > :first-child{margin-top:auto}
+#s-limit > :last-child{margin-bottom:auto}
+.res-title{font-size:25px;line-height:1.12;font-weight:900;letter-spacing:-.01em;margin-top:auto;max-width:330px}
+.win .res-title{font-size:30px;color:var(--on-bg-brand)}
+.res-sub{font-size:16px;line-height:1.2;font-weight:800}
+.res-sub:empty{display:none}
+.score{display:flex;align-items:baseline;justify-content:center;gap:8px}
+.score b{font-size:68px;line-height:.95;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.win .score b{text-shadow:0 4px 24px rgba(255,212,92,.6)}
+.score span{font-size:18px;font-weight:700;color:var(--on-bg-muted)}
+.res-drink{font-size:13px;line-height:1.3;color:var(--on-bg-muted);max-width:330px}
+.rows{display:flex;gap:6px;width:100%;max-width:340px}
+.rows div{flex:1;min-width:0;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:14px;padding:5px 2px}
+.rows span{display:block;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rows b{display:block;font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+.rows .is-100{background:linear-gradient(180deg,#FFE58F,var(--sun));border-color:var(--sun)}
+/* призовой билет */
+.ticket{
+  position:relative;width:100%;max-width:340px;background:var(--card);color:var(--ink);margin-top:8px;
+  border:3px dashed var(--brand);border-radius:22px;padding:18px 14px 11px;box-shadow:0 10px 26px rgba(31,42,42,.12);
+}
+.ticket-tag{
+  position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--brand-dark);color:#fff;white-space:nowrap;
+  font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:4px 12px;border-radius:999px;z-index:1;
+}
+.ticket-main{font-size:15px;line-height:1.25;font-weight:800}
+.ticket-word{
+  display:inline-block;margin-top:8px;font-size:30px;line-height:1;font-weight:900;letter-spacing:.05em;color:var(--accent);
+  background:#fff;border-radius:14px;padding:9px 16px;box-shadow:inset 0 0 0 2px var(--line);
+}
+.ticket-one{margin-top:8px;font-size:13px;font-weight:700;color:var(--muted)}
+.ticket-stamp{
+  margin-top:8px;padding-top:8px;border-top:2px dashed var(--line);
+  font-size:18px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--brand-dark);
+}
+.ticket-deco{display:none;position:absolute;pointer-events:none}
+/* зима: билет как новогодняя открытка — тёплый свет, ленточка с бантом, ёлочный шар */
+#app.winter .ticket{
+  border:0;background:radial-gradient(130% 90% at 50% 0%,#FFF1CC 0%,#FFFDF6 55%,#FFEEDA 100%);
+  box-shadow:0 0 0 2px #F3D59A,0 0 0 6px rgba(255,255,255,.92),0 14px 44px rgba(255,190,99,.5);
+}
+#app.winter .ticket::before{
+  content:"";position:absolute;left:0;top:0;width:60px;height:60px;border-top-left-radius:22px;pointer-events:none;
+  background:linear-gradient(135deg,rgba(220,34,60,0) 30%,#C41A33 30%,#F0445C 41%,#C41A33 52%,rgba(220,34,60,0) 52%);
+}
+#app.winter .ticket-deco{display:block}
+.ticket-bow{left:4px;top:5px;width:30px;height:25px}
+.ticket-ball{right:16px;top:-3px;width:22px;height:44px}
+#app.winter .ticket-main{padding:0 36px}
+#app.winter .ticket-stamp{border-top-color:#F3D59A}
+.note{font-size:15px;line-height:1.35;color:var(--on-bg-muted);max-width:330px}
+.note:empty{display:none}
+.note.strong{color:var(--on-bg);font-weight:800}
+#res-left{margin-bottom:auto}
+.limit-title{font-size:27px;line-height:1.15;font-weight:900;max-width:320px}
+.limit-record{font-size:18px;line-height:1.3;font-weight:800;color:var(--on-bg-brand)}
+.limit-prize{font-size:20px;line-height:1.2;font-weight:900}
+.limit-prize small{display:block;font-size:15px;font-weight:800;color:var(--on-bg-muted)}
+@media (max-height:600px){
+  #s-result{gap:6px;padding-top:2px}
+  .res-title{font-size:22px}
+  .win .res-title{font-size:25px}
+  .res-sub{font-size:15px}
+  .score b{font-size:50px}
+  .win .res-drink{display:none}
+  .ticket{padding:16px 12px 9px;margin-top:6px}
+  .ticket-main{font-size:14px}
+  .ticket-word{font-size:26px;padding:7px 14px;margin-top:6px}
+  .ticket-one{margin-top:6px;font-size:12px}
+  .ticket-stamp{margin-top:6px;padding-top:6px;font-size:16px}
+  .btn-row .btn{padding-top:11px;padding-bottom:11px}
+  .note{font-size:13px}
+  .limit-title{font-size:24px}
+}
+
+#fx{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.toast{
+  position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;pointer-events:none;
+  background:var(--ink);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:999px;
+  opacity:0;transition:opacity .25s;white-space:nowrap;
+}
+.toast.on{opacity:.92}
+@media (prefers-reduced-motion:reduce){
+  .hero,.btn::after,.wd-flake,#app.winter::before,.hint.pulse,.h-steam,.chip.bump{animation:none !important}
+  .screen.is-on{animation-duration:.01s}
+  .screen.is-leaving{display:none}
+}
+
+/* ===== Маскот (v5): один data-URI (assets/mascot-256.webp) в переменной #app, используется на старте и у билета ===== */
+#app{--wd-img:url("data:image/webp;base64,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")}
+.wd-mascot{display:block;flex:none;width:clamp(72px,18vh,136px);height:clamp(72px,18vh,136px);
+  background:var(--wd-img) center/contain no-repeat;transform-origin:50% 92%;
+  animation:wd-sway 3.6s ease-in-out infinite;filter:drop-shadow(0 6px 8px rgba(31,42,42,.18));
+  pointer-events:none;-webkit-user-select:none;user-select:none}
+/* у билета маскот выглядывает над его правым верхним краем и не занимает места в потоке (кнопки не уезжают) */
+.wd-prize-m{display:none;position:relative;height:0;width:100%;flex:none;pointer-events:none;z-index:2}
+.wd-prize-m::before{content:"";position:absolute;right:0;bottom:-12px;width:clamp(68px,10vh,88px);height:clamp(68px,10vh,88px);
+  background:var(--wd-img) center/contain no-repeat;transform-origin:50% 92%;animation:wd-sway 3.6s ease-in-out infinite;
+  filter:drop-shadow(0 4px 6px rgba(31,42,42,.22))}
+.screen:has(.ticket:not([hidden])) .wd-prize-m{display:block}
+@keyframes wd-sway{0%,100%{transform:rotate(-2.5deg) translateY(0)}50%{transform:rotate(2.5deg) translateY(-3px)}}
+#app.winter .wd-mascot,#app[data-season="winter"] .wd-mascot{
+  background:var(--wd-img) center/contain no-repeat,radial-gradient(closest-side,rgba(255,244,214,.62),rgba(255,244,214,.22) 62%,rgba(255,244,214,0) 100%);
+  filter:drop-shadow(0 0 5px rgba(255,255,255,.55)) drop-shadow(0 4px 8px rgba(0,0,0,.3))}
+#app.winter .wd-prize-m::before,#app[data-season="winter"] .wd-prize-m::before{
+  background:var(--wd-img) center/contain no-repeat,radial-gradient(closest-side,rgba(255,244,214,.62),rgba(255,244,214,.22) 62%,rgba(255,244,214,0) 100%);
+  filter:drop-shadow(0 0 5px rgba(255,255,255,.55)) drop-shadow(0 4px 8px rgba(0,0,0,.3))}
+@media (max-height:640px){.wd-mascot{width:72px;height:72px}}
+@media (prefers-reduced-motion:reduce){.wd-mascot,.wd-prize-m::before{animation:none}}
+
+/* ===== Ссылка в зал игр (v5): одна на приложение, видна на стартовом экране и на экране результата ===== */
+.wd-back{display:none;position:absolute;left:6px;top:6px;z-index:30;padding:9px 10px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color:var(--brand-dark,#156F6E);text-decoration:none;border-radius:999px;-webkit-tap-highlight-color:transparent}
+#app:has(#s-start.is-on) .wd-back,#app:has(#s-result.is-on) .wd-back{display:block}
+.wd-back:hover,.wd-back:focus-visible{text-decoration:underline}
+#app.winter .wd-back,#app[data-season="winter"] .wd-back{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}
+</style>
+</head>
+<body>
+<div id="app">
+  <a class="wd-back" href="../index.html">← Все игры</a>
+
+  <!-- Шапка бренда: видна на каждом экране. Снежинка рядом со знаком — только зимой. -->
+  <header class="wd">
+    <div class="wd-mark">WeDrink<svg class="wd-flake" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v14M1.9 4.5l12.2 7M1.9 11.5l12.2-7M8 3.6L6.4 2M8 3.6L9.6 2M8 12.4L6.4 14M8 12.4L9.6 14"/></svg></div>
+    <div class="wd-city">Новосибирск</div>
+    <div class="wd-tag">Настоящий азиатский чай</div>
+  </header>
+
+  <div class="screens">
+
+  <!-- Экран 1: старт -->
+  <section class="screen scroll is-on" id="s-start">
+    <div class="hero-row">
+      <!-- MASCOT_SLOT -->
+      <div class="wd-mascot"></div>
+      <svg class="hero" viewBox="-6 -26 132 178" aria-hidden="true">
+        <defs>
+          <clipPath id="cupclip"><path d="M22.5 22 L97.5 22 L88.5 134 Q87.8 142 80 142 L40 142 Q32.2 142 31.5 134 Z"/></clipPath>
+          <linearGradient id="hg-glass" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".16" stop-color="#fff" stop-opacity=".12"/>
+            <stop offset=".7" stop-color="#fff" stop-opacity=".03"/><stop offset="1" stop-color="#fff" stop-opacity=".36"/>
+          </linearGradient>
+          <linearGradient id="hg-straw" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stop-color="#C41A33"/><stop offset=".42" stop-color="#F4566C"/><stop offset="1" stop-color="#B8162E"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="60" cy="145" rx="36" ry="5" fill="#1F2A2A" opacity=".14"/>
+        <g class="h-winter">
+          <path class="h-steam" d="M46 8 q-6 -8 0 -15 q6 -7 0 -14"/>
+          <path class="h-steam s2" d="M60 6 q-6 -8 0 -15 q6 -7 0 -14"/>
+          <path class="h-steam s3" d="M76 8 q-6 -8 0 -15 q6 -7 0 -14"/>
+        </g>
+        <rect x="63" y="-22" width="12" height="46" rx="4" fill="url(#hg-straw)" transform="rotate(8 69 20)"/>
+        <path d="M22.5 22 L97.5 22 L88.5 134 Q87.8 142 80 142 L40 142 Q32.2 142 31.5 134 Z" fill="#fff" opacity=".34"/>
+        <g clip-path="url(#cupclip)">
+          <rect id="h-l0" x="14" y="86" width="92" height="60"/>
+          <rect id="h-l1" x="14" y="58" width="92" height="28"/>
+          <path id="h-l2" d="M14 60 L14 46 Q26 39 37 45 Q49 38 60 44 Q71 38 83 45 Q94 39 106 46 L106 60 Z"/>
+          <g id="h-pearls">
+            <circle class="h-pearl" cx="44" cy="135" r="5"/><circle class="h-pearl" cx="56" cy="136" r="5"/>
+            <circle class="h-pearl" cx="68" cy="135" r="5"/><circle class="h-pearl" cx="79" cy="135" r="4.6"/>
+            <circle class="h-pearl" cx="50" cy="126" r="5"/><circle class="h-pearl" cx="62" cy="126" r="5"/>
+            <circle class="h-pearl" cx="74" cy="127" r="4.6"/>
+          </g>
+          <rect x="14" y="20" width="92" height="126" fill="url(#hg-glass)"/>
+          <path d="M31 34 L37 120" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".45" fill="none"/>
+        </g>
+        <path class="h-edge" d="M22.5 22 L97.5 22 L88.5 134 Q87.8 142 80 142 L40 142 Q32.2 142 31.5 134 Z"/>
+        <path class="h-outline" d="M22.5 22 L97.5 22 L88.5 134 Q87.8 142 80 142 L40 142 Q32.2 142 31.5 134 Z"/>
+        <text class="h-logo" x="60" y="106" text-anchor="middle">WeDrink</text>
+        <g class="h-winter">
+          <path d="M28.6 114 L91.4 114 L89.9 133 L30.1 133 Z" fill="#1B8F8E" stroke="#156F6E" stroke-width="1"/>
+          <path d="M29 117 L91 117 M30 130 L90 130" stroke="#DC223C" stroke-width="2" fill="none"/>
+          <path d="M33 126 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+        </g>
+        <rect class="h-film" x="17" y="15" width="86" height="9" rx="4"/>
+        <rect class="h-film-shine" x="23" y="17" width="74" height="2" rx="1"/>
+        <line class="h-mark" x1="12" y1="42" x2="110" y2="42"/>
+      </svg>
+    </div>
+    <h1 class="title">Налей до&nbsp;<span>черты</span></h1>
+    <p class="daily">Напиток дня: <b id="daily-name"></b> · сложность&nbsp;<span class="stars" id="daily-stars"></span></p>
+    <p class="rule" id="rule"></p>
+    <button class="btn" id="btn-play" type="button">Играть</button>
+    <div class="profile" id="profile-start"></div>
+    <div class="meta">
+      <div id="start-record"></div>
+      <div id="start-attempts"></div>
+    </div>
+    <div class="proto" id="proto-start">прототип</div>
+  </section>
+
+  <!-- Экран 2: игра -->
+  <section class="screen" id="s-game">
+    <div class="hud">
+      <div class="chip" id="chip-0"><i></i><b>—</b></div>
+      <div class="chip" id="chip-1"><i></i><b>—</b></div>
+      <div class="chip" id="chip-2"><i></i><b>—</b></div>
+      <div class="chip total" id="chip-sum"><i>Счёт</i><b id="sum">0</b></div>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="caption" id="caption" aria-live="polite"><small id="cap-step"></small><strong id="cap-text"></strong></div>
+      <div class="pop" id="pop"><b id="pop-score"></b><span id="pop-text"></span></div>
+    </div>
+    <div class="hint" id="hint"></div>
+  </section>
+
+  <!-- Экран 3: результат. Билет (#ticket) заполняет скрипт: слово дня, дата и время. -->
+  <section class="screen scroll" id="s-result">
+    <h2 class="res-title" id="res-title"></h2>
+    <p class="res-sub" id="res-sub"></p>
+    <div class="score"><b id="res-score">0</b><span id="res-max"></span></div>
+    <p class="res-drink" id="res-drink"></p>
+    <div class="wd-prize-m" aria-hidden="true"></div>
+    <div class="rows" id="res-rows"></div>
+    <div class="ticket" id="ticket" hidden></div>
+    <p class="note" id="res-note"></p>
+    <div class="btn-row">
+      <button class="btn" id="btn-again" type="button">Ещё раз</button>
+      <button class="btn ghost" id="btn-home" type="button">На старт</button>
+    </div>
+    <p class="note" id="res-left"></p>
+  </section>
+
+  <!-- Экран 4: попытки на сегодня кончились -->
+  <section class="screen scroll" id="s-limit">
+    <h2 class="limit-title">На сегодня всё. Завтра новый напиток</h2>
+    <p class="limit-record" id="limit-record"></p>
+    <p class="limit-prize" id="limit-prize" hidden></p>
+    <div class="ticket" id="ticket-limit" hidden></div>
+    <div class="profile" id="profile-limit"></div>
+  </section>
+
+  </div>
+
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =====================================================================
+     НАСТРОЙКИ — всё, что крутят при балансировке, лежит здесь
+     ===================================================================== */
+  var MAX_SCORE = 300;          // шкала 0–300: три слоя по 100
+  var PRIZE_TOPPING = 290;      // 290–299 — топпинг в подарок
+  var PRIZE_DRINK = 300;        // 300 — напиток в подарок (только три «идеально» подряд)
+  var ATTEMPTS_PER_DAY = 2;     // попыток в день (счётчик в localStorage; без хранилища лимита нет)
+  var LAYER_MAX = 100;          // максимум очков за слой
+  var COLLECT_MIN = 200;        // напиток дня попадает в коллекцию, если набрано столько и больше
+
+  // СЕЗОН: 'winter' или 'default'. Сам выбирается по дате: с 15 ноября по 28 февраля — зима.
+  // Для проверки: ?season=winter или ?season=default. Сезон меняет только вид и подачу (горячий напиток без льда);
+  // механика, очки и баланс от него не зависят.
+  var SEASON = pickSeason(new Date());
+
+  // ЭКРАН ПРИЗА. Пока слова дня — заглушки, на экранах висит метка «прототип».
+  var IS_PROTOTYPE = true;
+  // Слово дня для кассы; индекс — день недели Date.getDay(): 0 — воскресенье.
+  var WORDS_TOPPING = ['СЛОВО-ВС', 'СЛОВО-ПН', 'СЛОВО-ВТ', 'СЛОВО-СР', 'СЛОВО-ЧТ', 'СЛОВО-ПТ', 'СЛОВО-СБ'];   // PLACEHOLDER: слова выдаст касса
+  var WORDS_DRINK = ['СЛОВО-ВС', 'СЛОВО-ПН', 'СЛОВО-ВТ', 'СЛОВО-СР', 'СЛОВО-ЧТ', 'СЛОВО-ПТ', 'СЛОВО-СБ'];     // PLACEHOLDER: слова выдаст касса
+
+/* ===== Слова недели из общего файла (v5): ../config/words.json ===== */
+/* Единственный сетевой запрос игры. Таймаут 2,5 с. При любой ошибке, при открытии с диска (file://) и при неверной
+   форме (два массива по 7 непустых строк) остаются встроенные значения выше. Экран приза читает слова в момент показа. */
+function refreshTicketWords() {   // билет мог быть показан до ответа сервера (экран «попытки кончились»): обновить слова и метку
+  var ws = document.querySelectorAll('.ticket-word[data-wk]'), i, w, a, d, tags;
+  for (i = 0; i < ws.length; i++) {
+    w = ws[i]; a = w.getAttribute('data-wk') === 'drink' ? WORDS_DRINK : WORDS_TOPPING; d = parseInt(w.getAttribute('data-dow'), 10);
+    if (a[d]) w.textContent = a[d];
+  }
+  if (!IS_PROTOTYPE) { tags = document.querySelectorAll('.ticket-tag'); for (i = 0; i < tags.length; i++) tags[i].style.display = "none"; }
+}
+function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el.protoStart.hidden = !IS_PROTOTYPE; } catch (e) { /* элемент ещё не готов */ } }
+(function loadWeekWords() {
+  try {
+    if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
+    var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 2500);
+    var okList = function (a) {
+      if (!Array.isArray(a) || a.length !== 7) return false;
+      for (var i = 0; i < 7; i++) { if (typeof a[i] !== 'string' || !a[i].trim() || a[i].length > 40 || /[<>]/.test(a[i])) return false; }
+      return true;
+    };
+    fetch('../config/words.json?v=' + Math.floor(Date.now() / 86400000), ctl ? { signal: ctl.signal } : undefined)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (o) {
+        if (!o || !okList(o.topping) || !okList(o.drink)) return;
+        WORDS_TOPPING = o.topping.map(function (s) { return s.trim(); });
+        WORDS_DRINK = o.drink.map(function (s) { return s.trim(); });
+        if (typeof o.prototype === 'boolean') IS_PROTOTYPE = o.prototype;
+        onWeekWords();
+      })
+      .catch(function () { /* молча: остаются встроенные слова */ })
+      .then(function () { clearTimeout(timer); });
+  } catch (e) { /* остаются встроенные слова */ }
+})();
+
+
+  // Кривая очков за слой. e — отклонение уровня от черты в долях высоты стакана (0 = дно, 1 = край),
+  // p — допуск «идеально», mid и near — очки на отклонениях MID_ERR и NEAR_ERR (всё из сложности дня):
+  //   e <= p              -> 100 («идеально»)
+  //   p < e <= MID_ERR    -> от 99 до mid линейно (крутой участок: здесь решается судьба 290)
+  //   MID_ERR < e <= NEAR -> от mid до near линейно
+  //   NEAR_ERR < e < ZERO -> от near до 0 линейно (пологий участок: «почти», а не наказание)
+  //   e >= ZERO_ERR, перелив через край -> 0
+  var MID_ERR = 0.01;           // у самой черты: отклонение до 1% высоты
+  var NEAR_ERR = 0.03;          // рядом: отклонение до 3% высоты
+  var ZERO_ERR = 0.20;          // отклонение 20% высоты и больше = 0 очков
+  var TARGET_MAX = 0.94;        // выше этой доли черту не ставим (до края остаётся запас)
+  var MIN_LAYER_ROOM = 0.06;    // если прошлый слой залез выше следующей черты, сдвигаем её на столько над уровнем
+
+  // СЛОЖНОСТЬ ДНЯ: три набора параметров (баланс v3: приз стоит денег).
+  //   speed   — множитель скорости налива всех слоёв;
+  //   perfect — допуск «идеально» в долях высоты стакана (0.0028 = 0,28% высоты, меньше 1 px);
+  //   mid     — очки на отклонении 1% высоты (чем меньше, тем круче кривая у самой черты);
+  //   near    — очки на отклонении 3% высоты;
+  //   wobble  — размах «дыхания» струи: скорость плавает на +-wobble вокруг своей кривой.
+  var DIFFICULTY = {
+    1: { speed: 0.95, perfect: 0.0028, mid: 86, near: 78, wobble: 0.16 },   // ★☆☆
+    2: { speed: 1.10, perfect: 0.0023, mid: 83, near: 76, wobble: 0.22 },   // ★★☆
+    3: { speed: 1.25, perfect: 0.0019, mid: 80, near: 72, wobble: 0.28 }    // ★★★
+  };
+  var SPEED_JITTER = 0.15;      // +-15% к скорости слоя от попытки к попытке (детерминированно), чтобы не считать секунды
+  var WOBBLE_W_MIN = 3.4;       // частота «дыхания» струи, рад/с: от ... (период около 1,8 с)
+  var WOBBLE_W_MAX = 5.6;       // ... до (период около 1,1 с); частота и фазы — от даты и номера попытки
+  var WOBBLE_2 = 0.45;          // доля второй, более быстрой волны (в 2,6 раза чаще)
+
+  // Три налива по порядку. Уровень растёт со скоростью (v0 + accel * t) * «дыхание» (долей высоты в секунду),
+  // t — сколько держим; stream — толщина струи в px при стакане 300 px.
+  var SLOTS = [
+    { v0: 0.12, accel: 0.08, stream: 9 },
+    { v0: 0.14, accel: 0.16, stream: 10 },
+    { v0: 0.07, accel: 0.24, stream: 13 }
+  ];
+  // Толщина слоя (от неё считается черта): большой, средний, малый. У напитка thick — какой размер у слоя по порядку.
+  var SIZES = [
+    { minH: 0.34, maxH: 0.46 },
+    { minH: 0.22, maxH: 0.30 },
+    { minH: 0.12, maxH: 0.18 }
+  ];
+
+  // ИНГРЕДИЕНТЫ — только из меню (cards/menu_data.py). pal — пара цветов в :root (--<pal>-top / --<pal>-bot).
+  // Жидкости: shine — яркость блика, milky — молочная пена по поверхности, foamy — ложится «шапкой»,
+  //   bubbly — пузырьки, thick — густое (струя тяжёлая, волна гасится быстрее).
+  // Твёрдые (solid): круглые тела с гравитацией и столкновениями. kinds — виды тел по очереди,
+  //   r — радиус в долях высоты стакана, rho — плотность к жидкости (>1 тонет, <1 плавает), fill — плотность укладки.
+  //   Уровень при этом поднимает жидкость под ними: тела её вытесняют.
+  var ING = {
+    blackTea: { chip: 'Чай',     short: 'чай',     pal: 'tea',   shine: 0.5,  bubbly: true },
+    jasmine:  { chip: 'Чай',     short: 'чай',     pal: 'light', shine: 0.6,  bubbly: true },
+    berryTea: { chip: 'Чай',     short: 'чай',     pal: 'rose',  shine: 0.55, bubbly: true },
+    chocoTea: { chip: 'Чай',     short: 'чай',     pal: 'choco', shine: 0.45, bubbly: true },
+    milk:     { chip: 'Молоко',  short: 'молоко',  pal: 'milk',  shine: 0.85, milky: true },
+    cocoMilk: { chip: 'Молоко',  short: 'молоко',  pal: 'coco',  shine: 0.9,  milky: true },
+    grapeJam: { chip: 'Джем',    short: 'джем',    pal: 'grape', shine: 0.5,  thick: true },
+    foam:     { chip: 'Пенка',   short: 'пенка',   pal: 'foam',  shine: 0.85, milky: true, foamy: true, thick: true },
+    tapioca:  { chip: 'Тапиока', short: 'тапиока', solid: { kinds: ['pearl'],         r: 0.030, rho: 1.8,  fill: 0.80 } },
+    duo:      { chip: 'Добавки', short: 'добавки', solid: { kinds: ['pearl', 'bean'], r: 0.028, rho: 1.8,  fill: 0.80 } },
+    jelly:    { chip: 'Желе',    short: 'желе',    solid: { kinds: ['jelly'],         r: 0.031, rho: 1.5,  fill: 0.80 } },
+    ice:      { chip: 'Лёд',     short: 'лёд',     solid: { kinds: ['ice'],           r: 0.044, rho: 0.6,  fill: 0.72 } },
+    lemon:    { chip: 'Лимон',   short: 'лимон',   solid: { kinds: ['lemon'],         r: 0.048, rho: 0.7,  fill: 0.72 } },
+    oreo:     { chip: 'Oreo',    short: 'Oreo',    solid: { kinds: ['oreo'],          r: 0.024, rho: 0.72, fill: 0.72 } }
+  };
+
+  // НАПИТОК ДНЯ по дню недели локальной даты (индекс = Date.getDay(): 0 — воскресенье).
+  // Название — точно как в меню. stars — сложность (ключ DIFFICULTY). layers — три слоя снизу вверх,
+  // только ингредиенты этого напитка из меню (в комментарии — строка меню); caps — подпись перед слоем;
+  // thick — размеры слоёв (индексы SIZES), по умолчанию [0, 1, 2]. hot — в меню «холодный или горячий»: зимой подаём горячим,
+  // с паром; winter — зимний состав слоёв, если летний со льдом (размеры слоёв те же, баланс не меняется).
+  var DRINKS = [
+    // Вс. Меню: «Чай на кокосовом молоке. Горячий или со льдом» — летом со льдом, зимой горячий без льда
+    { name: 'Шоколадный кокосовый чай', stars: 3, hot: true, layers: ['chocoTea', 'cocoMilk', 'ice'],
+      caps: ['Льём шоколадный чай', 'Теперь кокосовое молоко', 'Сверху лёд'],
+      winter: { layers: ['cocoMilk', 'chocoTea', 'cocoMilk'],
+        caps: ['Сначала кокосовое молоко', 'Теперь шоколадный чай', 'Сверху ещё кокосовое молоко'] } },
+    // Пн. Меню: «Молочная основа, чёрный чай» — ингредиентов два, третий слой повторяет молочную основу
+    { name: 'Классический молочный чай', stars: 1, hot: true, layers: ['milk', 'blackTea', 'milk'], thick: [1, 0, 2],
+      caps: ['Сначала молочная основа', 'Теперь чёрный чай', 'Сверху ещё молочная основа'] },
+    // Вт. Меню: «Молочная основа, чёрный чай, жемчужная тапиока»
+    { name: 'Молочный чай с тапиокой', stars: 1, hot: true, layers: ['blackTea', 'milk', 'tapioca'],
+      caps: ['Льём чёрный чай', 'Теперь молочная основа', 'Сыплем жемчужную тапиоку'] },
+    // Ср. Меню: «Жасминовый чай, виноградный джем, дольки лимона, кокосовые дольки. Холодный»
+    { name: 'Виноградно-лимонный чай', stars: 2, layers: ['grapeJam', 'jasmine', 'lemon'], thick: [1, 0, 2],
+      caps: ['Сначала виноградный джем', 'Теперь жасминовый чай', 'Сверху дольки лимона'] },
+    // Чт. Меню: «Молочная основа, чёрный чай и две добавки на выбор: … тапиока и красная фасоль …»
+    { name: 'Двойной молочный чай', stars: 2, hot: true, layers: ['blackTea', 'milk', 'duo'],
+      caps: ['Льём чёрный чай', 'Теперь молочная основа', 'Тапиока и красная фасоль'] },
+    // Пт. Меню: «Жасминовый чай, кубики персикового желе, шапка сырной пенки. Клубничный вкус. Холодный»
+    { name: 'Клубничный чай с сырной пенкой', stars: 3, layers: ['berryTea', 'jelly', 'foam'], thick: [0, 2, 1],
+      caps: ['Жасминовый чай, клубничный вкус', 'Кубики персикового желе', 'Шапка сырной пенки'] },
+    // Сб. Меню: «Молочный чай с Oreo»
+    { name: 'Oreo молочный чай', stars: 2, hot: true, layers: ['blackTea', 'milk', 'oreo'],
+      caps: ['Льём чёрный чай', 'Теперь молочная основа', 'Сверху Oreo'] }
+  ];
+  var DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];                          // коллекцию показываем с понедельника
+  var DOW_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+  // Тайминги, мс
+  var INTRO_MS = 950;           // подпись «что льём сейчас» перед слоем (нажатия в это время не считаются)
+  var SETTLE_MS = 1150;         // показ очков после слоя
+  var FINAL_MS = 2300;          // после третьего слоя: плёнка запаивается, входит трубочка
+  var SPILL_MS = 2100;          // пролив: капли по стенке и лужа
+
+  var STORAGE_KEY = 'wedrink.naley-do-cherty.v2';   // ключ этой игры: попытки за день, рекорды
+  var PROFILE_KEY = 'wedrink.profile.v1';           // общий профиль всех игр WeDrink: серия и коллекция
+
+  /* =====================================================================
+     УТИЛИТЫ
+     ===================================================================== */
+  var imul = Math.imul || function (a, b) {
+    var ah = (a >>> 16) & 0xffff, al = a & 0xffff, bh = (b >>> 16) & 0xffff, bl = b & 0xffff;
+    return (al * bl + (((ah * bl + al * bh) << 16) >>> 0)) | 0;
+  };
+  // Детерминированный генератор (mulberry32) с сидом: встроенный генератор случайных чисел в игре не используется.
+  function mulberry32(seed) {
+    var a = seed | 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = imul(a ^ (a >>> 15), 1 | a);
+      t = (t + imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seedFor(dateInt, attemptNo) {
+    return (imul(dateInt | 0, 0x01000193) ^ imul(attemptNo | 0, 0x9E3779B1)) | 0;
+  }
+  // Число 0..1 по паре целых — раскладка кусочков в слое (только рисование)
+  function hash2(ix, iy) {
+    var h = imul(ix | 0, 374761393) ^ imul(iy | 0, 668265263);
+    h = imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  var nowMs = (window.performance && typeof performance.now === 'function')
+    ? function () { return performance.now(); }
+    : function () { return Date.now(); };
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function dateKey(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function dateIntOf(key) { return parseInt(String(key).split('-').join(''), 10) || 0; }
+  function prevDayKey(key) {                       // 'ГГГГ-ММ-ДД' вчерашнего дня
+    var p = String(key).split('-');
+    return dateKey(new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10) - 1));
+  }
+  function num(v) { v = Number(v); return (isFinite(v) && v > 0) ? Math.floor(v) : 0; }
+  function isObj(v) { return !!v && typeof v === 'object' && Object.prototype.toString.call(v) !== '[object Array]'; }
+  function starsText(n) { var s = '', i; for (i = 0; i < 3; i++) s += i < n ? '★' : '☆'; return s; }
+  function daysWord(n) {
+    var a = n % 10, b = n % 100;
+    if (a === 1 && b !== 11) return 'день';
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return 'дня';
+    return 'дней';
+  }
+  function rgba(hex, a) {
+    var h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return hex;
+    var n = parseInt(h, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+
+  /* =====================================================================
+     ХРАНИЛИЩЕ: счётчик попыток и рекорды. Всё в try/catch —
+     в приватном режиме и встроенных браузерах localStorage может не работать.
+     Тогда игра идёт без лимита, данные живут в памяти до закрытия страницы.
+     ===================================================================== */
+  var store = (function () {
+    var ok = false, mem = null;
+    try {
+      var probe = STORAGE_KEY + '.probe';
+      window.localStorage.setItem(probe, '1');
+      window.localStorage.removeItem(probe);
+      ok = true;
+    } catch (e) { ok = false; }
+    return {
+      ok: ok,
+      read: function () {
+        if (!ok) return mem;
+        try {
+          var raw = window.localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) { return mem; }
+      },
+      write: function (v) {
+        mem = v;
+        if (!ok) return;
+        try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); } catch (e) { /* нет места или доступа */ }
+      }
+    };
+  })();
+
+  // Состояние дня: { date: 'YYYY-MM-DD', used: попыток начато, best: рекорд дня, top: рекорд за всё время }
+  function loadDay() {
+    var s = store.read(), today = dateKey(new Date());
+    if (!isObj(s)) s = {};
+    if (s.date !== today) return { date: today, used: 0, best: 0, top: num(s.top) };
+    return { date: today, used: num(s.used), best: num(s.best), top: num(s.top) };
+  }
+  function saveDay(day) { store.write(day); }
+
+  /* =====================================================================
+     ОБЩИЙ ПРОФИЛЬ WeDrink (один на все игры): { streak, lastDay, collection: { '<день 0-6>': счёт } }.
+     Читаем объект целиком, меняем только свои три поля и свой день в collection, чужие поля не трогаем.
+     Без хранилища профиль живёт в памяти до закрытия страницы.
+     ===================================================================== */
+  var profileMem = null;
+  function readProfile() {
+    var p = null;
+    if (store.ok) {
+      try {
+        var raw = window.localStorage.getItem(PROFILE_KEY);
+        p = raw ? JSON.parse(raw) : null;
+      } catch (e) { p = profileMem; }
+    } else {
+      p = profileMem;
+    }
+    return isObj(p) ? p : {};
+  }
+  function writeProfile(p) {
+    profileMem = p;
+    if (!store.ok) return;
+    try { window.localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* нет места или доступа */ }
+  }
+  // Что показать: серия жива, если последний игровой день — сегодня или вчера
+  function profileView(p, today) {
+    var streak = num(p.streak), last = typeof p.lastDay === 'string' ? p.lastDay : '';
+    var col = isObj(p.collection) ? p.collection : {}, got = [], count = 0, d;
+    if (last !== today && last !== prevDayKey(today)) streak = 0;
+    for (d = 0; d < 7; d++) {
+      got.push(num(col[String(d)]) >= COLLECT_MIN);
+      if (got[d]) count += 1;
+    }
+    return { streak: streak, got: got, count: count };
+  }
+  // Отметить игровой день: играл вчера — серия растёт, пропустил день — начинается с 1
+  function touchStreak(p, today) {
+    var last = typeof p.lastDay === 'string' ? p.lastDay : '', s = num(p.streak);
+    if (last === today) s = Math.max(1, s);
+    else if (last === prevDayKey(today)) s = s + 1;
+    else s = 1;
+    p.streak = s;
+    p.lastDay = today;
+    return p;
+  }
+  // Записать счёт в коллекцию напитков недели (храним максимум по дню недели)
+  function addToCollection(p, dow, total) {
+    if (!isObj(p.collection)) p.collection = {};
+    var key = String(dow);
+    if (total > num(p.collection[key])) p.collection[key] = total;
+    return p;
+  }
+
+  /* =====================================================================
+     ПОДСЧЁТ ОЧКОВ И ПЛАН ПОПЫТКИ
+     level и target — доли высоты стакана. spilled — уровень дошёл до края.
+     ===================================================================== */
+  function scoreFor(level, target, spilled, perfectTol, diff) {
+    if (spilled || level >= 1) return 0;                 // перелив через край
+    var err = Math.abs(level - target), s;
+    var mid = (diff && diff.mid) || DIFFICULTY[2].mid, near = (diff && diff.near) || DIFFICULTY[2].near;
+    if (err <= perfectTol) return LAYER_MAX;             // точно в черту
+    if (err >= ZERO_ERR) return 0;
+    if (err <= MID_ERR) {                                // у самой черты: 99 -> mid
+      s = (LAYER_MAX - 1) - (LAYER_MAX - 1 - mid) * (err - perfectTol) / (MID_ERR - perfectTol);
+    } else if (err <= NEAR_ERR) {                        // рядом: mid -> near
+      s = mid - (mid - near) * (err - MID_ERR) / (NEAR_ERR - MID_ERR);
+    } else {                                             // пологий участок: near -> 0
+      s = near * (ZERO_ERR - err) / (ZERO_ERR - NEAR_ERR);
+    }
+    return Math.max(0, Math.min(LAYER_MAX - 1, Math.round(s)));   // 100 — только в пределах допуска
+  }
+  function verdict(score, level, target, spilled) {
+    if (spilled) return 'Через край!';
+    if (score === LAYER_MAX) return 'Идеально!';
+    if (score >= 95) return 'Почти идеально';
+    if (score >= 88) return 'Очень близко';
+    return level < target ? 'Недолив' : 'Перебор';
+  }
+  function prizeOf(total) {                              // '' | 'topping' | 'drink'
+    if (total >= PRIZE_DRINK) return 'drink';
+    return total >= PRIZE_TOPPING ? 'topping' : '';
+  }
+  // Черта следующего слоя не должна оказаться под уже налитым
+  function fitTarget(orig, floor) {
+    var t = Math.max(orig, floor + MIN_LAYER_ROOM);
+    if (t > TARGET_MAX) t = Math.max(TARGET_MAX, (floor + 1) / 2);
+    return t;
+  }
+  // План попытки: напиток и сложность — по дню недели; черты, множители скорости и «дыхание» струи —
+  // только от даты и номера попытки, поэтому перезагрузка страницы попытку не «перебрасывает».
+  function planRound(dateInt, attemptNo, dow) {
+    var drink = DRINKS[dow] || DRINKS[1], diff = DIFFICULTY[drink.stars] || DIFFICULTY[2];
+    var rnd = mulberry32(seedFor(dateInt, attemptNo));
+    var thick = drink.thick || [0, 1, 2];
+    var look = (SEASON === 'winter' && drink.winter) || drink;      // зимняя подача: другие слои, те же размеры
+    var targets = [], speedK = [], mods = [], ings = [], acc = 0, i, Z;
+    for (i = 0; i < SLOTS.length; i++) {
+      Z = SIZES[thick[i]] || SIZES[i];
+      acc += Z.minH + rnd() * (Z.maxH - Z.minH);
+      targets.push(Math.min(TARGET_MAX, Math.round(acc * 1000) / 1000));
+      speedK.push(1 + (rnd() * 2 - 1) * SPEED_JITTER);
+      mods.push({
+        a: diff.wobble,
+        w: WOBBLE_W_MIN + rnd() * (WOBBLE_W_MAX - WOBBLE_W_MIN),
+        p1: rnd() * 6.2832,
+        p2: rnd() * 6.2832
+      });
+      ings.push(ING[look.layers[i]] || ING.blackTea);
+    }
+    return { dow: dow, drink: drink, diff: diff, targets: targets, speedK: speedK, mods: mods, ings: ings, caps: look.caps };
+  }
+  // «Дыхание» струи: множитель скорости в момент t. Две волны с частотой и фазами из плана попытки:
+  // предугадать скорость у черты по счёту секунд нельзя, приходится смотреть на струю и уровень.
+  function wobbleAt(t, mod) {
+    if (!mod || !mod.a) return 1;
+    return 1 + mod.a * (Math.sin(mod.w * t + mod.p1) + WOBBLE_2 * Math.sin(mod.w * 2.6 * t + mod.p2)) / (1 + WOBBLE_2);
+  }
+  // Скорость налива слоя slot в момент t (секунд держим), долей высоты в секунду
+  function pourSpeed(slot, t, k, diff, mod) {
+    var S = SLOTS[slot];
+    return (S.v0 + S.accel * t) * wobbleAt(t, mod) * k * diff.speed;
+  }
+
+  // Сезон: параметр ?season= в адресе или дата (15 ноября — 28 февраля — зима)
+  function pickSeason(d) {
+    var q = '', m, mo = d.getMonth() + 1, day = d.getDate();
+    try { q = String(window.location.search || ''); } catch (e) { q = ''; }
+    m = /[?&]season=(winter|default)(?:&|$)/.exec(q);
+    if (m) return m[1];
+    return (mo === 12 || mo === 1 || (mo === 11 && day >= 15) || (mo === 2 && day <= 28)) ? 'winter' : 'default';
+  }
+
+  /* =====================================================================
+     ДАЛЬШЕ — DOM И РИСОВАНИЕ (всё, что выше, от страницы не зависит)
+     ===================================================================== */
+  function $(id) { return document.getElementById(id); }
+  var el = {
+    screens: { start: $('s-start'), game: $('s-game'), result: $('s-result'), limit: $('s-limit') },
+    app: $('app'), toast: $('toast'), fx: $('fx'),
+    dailyName: $('daily-name'), dailyStars: $('daily-stars'), rule: $('rule'), play: $('btn-play'),
+    profileStart: $('profile-start'), startRecord: $('start-record'), startAttempts: $('start-attempts'), protoStart: $('proto-start'),
+    heroLayers: [$('h-l0'), $('h-l1'), $('h-l2')], heroPearls: $('h-pearls'),
+    chips: [], chipSum: $('chip-sum'), sum: $('sum'), stage: $('stage'), canvas: $('cv'),
+    caption: $('caption'), capStep: $('cap-step'), capText: $('cap-text'),
+    pop: $('pop'), popScore: $('pop-score'), popText: $('pop-text'), hint: $('hint'),
+    resTitle: $('res-title'), resSub: $('res-sub'), resScore: $('res-score'), resMax: $('res-max'), resDrink: $('res-drink'), resRows: $('res-rows'),
+    ticket: $('ticket'), resNote: $('res-note'), again: $('btn-again'), home: $('btn-home'), resLeft: $('res-left'),
+    limitRecord: $('limit-record'), limitPrize: $('limit-prize'), ticketLimit: $('ticket-limit'), profileLimit: $('profile-limit')
+  };
+  (function () {
+    for (var i = 0; i < SLOTS.length; i++) {
+      var root = $('chip-' + i);
+      el.chips.push({ root: root, i: root.getElementsByTagName('i')[0], b: root.getElementsByTagName('b')[0] });
+    }
+  })();
+  var mainCtx = el.canvas.getContext('2d');
+  var ctx = mainCtx;                    // текущий холст: основной или заготовка (спрайт)
+  var WINTER = SEASON === 'winter';
+  var RM = false;                       // prefers-reduced-motion: без тряски, меньше частиц, без мерцания
+  try { RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { RM = false; }
+  var FONT = 'sans-serif';
+  var PI2 = Math.PI * 2;
+  var css = {};
+  var PALS = ['tea', 'light', 'rose', 'choco', 'milk', 'coco', 'grape', 'foam'];
+  function readPalette() {
+    var cs = window.getComputedStyle(document.documentElement), i, n;
+    function v(name, fallback) {
+      var s = cs.getPropertyValue(name);
+      s = s ? String(s).trim() : '';
+      return s || fallback;
+    }
+    css.brand = v('--brand', '#1B8F8E');
+    css.brandDark = v('--brand-dark', '#156F6E');
+    css.accent = v('--accent', '#DC223C');
+    css.ink = v('--ink', '#1F2A2A');
+    css.muted = v('--muted', '#3E4E50');
+    css.card = v('--card', '#FFFDF6');
+    css.soft = v('--soft', '#DDEDEA');
+    css.soft2 = v('--soft-2', '#CFE9E6');
+    css.sun = v('--sun', '#FFD45C');
+    css.mint = v('--mint', '#8FE3DC');
+    css.glass = v('--glass', '#FFFFFF');
+    for (i = 0; i < PALS.length; i++) {              // цвета напитков живут в :root; запасной цвет — нейтральный чайный
+      n = PALS[i];
+      css[n + 'Top'] = v('--' + n + '-top', '#E0B07A');
+      css[n + 'Bot'] = v('--' + n + '-bot', '#C08A52');
+    }
+    css.pearl = v('--pearl', '#3B2519');   css.pearlHi = v('--pearl-hi', '#7A5136');
+    css.bean = v('--bean', '#8E2F2A');     css.beanHi = v('--bean-hi', '#C2584C');
+    css.jelly = v('--jelly', '#FFBE85');   css.jellyEdge = v('--jelly-edge', '#F0955A');
+    css.ice = v('--ice', '#F4FBFF');       css.iceEdge = v('--ice-edge', '#A6D0DC');
+    css.lemon = v('--lemon', '#FFE873');   css.lemonEdge = v('--lemon-edge', '#E9B81F');
+    css.oreo = v('--oreo', '#2B201C');     css.oreoCream = v('--oreo-cream', '#F4EDE0');
+    css.night1 = v('--night-1', '#0F5059'); css.night2 = v('--night-2', '#10405E'); css.night3 = v('--night-3', '#142C52');
+    css.warm1 = v('--warm-1', '#FFE9A8');  css.warm2 = v('--warm-2', '#FFBE63');   css.warm3 = v('--warm-3', '#F0934A');
+    css.snow = v('--snow', '#FFFFFF');     css.snowShade = v('--snow-shade', '#C9E2EE');
+    FONT = window.getComputedStyle(document.body).fontFamily || 'sans-serif';
+  }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function buzz(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* вибрации нет — не страшно */ } }
+  // Цифры «набегают»: от from до to за ms; новый запуск на том же узле отменяет старый
+  function countUp(node, from, to, ms) {
+    var id = (node.cuId || 0) + 1, t0 = nowMs();
+    node.cuId = id;
+    if (RM || ms <= 0 || from === to) { node.textContent = String(to); return; }
+    (function step() {
+      if (node.cuId !== id) return;
+      var k = Math.min(1, (nowMs() - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      node.textContent = String(Math.round(from + (to - from) * e));
+      if (k < 1) window.requestAnimationFrame(step);
+    })();
+  }
+  // Цвет жидкости слоя i; твёрдый слой (тапиока, лёд…) жидкость не красит — берём ту, что под ним
+  function liquidOf(ings, i) {
+    while (i > 0 && ings[i].solid) i -= 1;
+    return ings[i].solid ? ING.blackTea : ings[i];
+  }
+
+  /* =====================================================================
+     ЭКРАНЫ
+     ===================================================================== */
+  var screen = 'start';
+  var stampTimer = 0, leaveTimer = 0;
+  function show(name) {
+    var prev = screen, k, node;
+    screen = name;
+    for (k in el.screens) {
+      if (!el.screens.hasOwnProperty(k)) continue;
+      node = el.screens[k];
+      node.classList.remove('is-leaving');
+      if (k === name) { node.classList.add('is-on'); continue; }
+      if (k === prev && !RM) node.classList.add('is-leaving');     // старый экран плавно уходит поверх нового
+      node.classList.remove('is-on');
+    }
+    clearTimeout(leaveTimer);
+    leaveTimer = setTimeout(function () {
+      for (var q in el.screens) if (el.screens.hasOwnProperty(q)) el.screens[q].classList.remove('is-leaving');
+    }, 260);
+    if (name === 'game') el.app.classList.add('is-game'); else el.app.classList.remove('is-game');
+    if (name === 'start') el.app.classList.add('is-start'); else el.app.classList.remove('is-start');
+    el.app.classList.remove('party');
+    if (name !== 'game') stopLoop();
+    if (stampTimer) { clearInterval(stampTimer); stampTimer = 0; }
+    fxKick();
+  }
+  function attemptsLeft(day) { return store.ok ? Math.max(0, ATTEMPTS_PER_DAY - day.used) : -1; } // -1 = без лимита
+
+  // Серия и коллекция из общего профиля: семь кружков-стаканов с понедельника, собранные закрашены
+  var CUP_SVG = '<svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12.5"/>' +
+    '<path d="M9 10 L19 10 L17.7 20.4 Q17.6 21.4 16.6 21.4 L11.4 21.4 Q10.4 21.4 10.3 20.4 Z"/>' +
+    '<rect x="8.2" y="7.2" width="11.6" height="2.6" rx="1.3"/></svg>';
+  function renderProfile(box) {
+    var now = new Date(), dow = now.getDay(), v = profileView(readProfile(), dateKey(now)), html, i, d;
+    html = '<div class="p-line"><span>Серия: ' + v.streak + ' ' + daysWord(v.streak) + '</span>' +
+      '<span>Коллекция: ' + v.count + ' из 7</span></div><div class="cups">';
+    for (i = 0; i < DOW_ORDER.length; i++) {
+      d = DOW_ORDER[i];
+      html += '<div class="cup' + (v.got[d] ? ' is-got' : '') + (d === dow ? ' is-today' : '') +
+        '" title="' + DRINKS[d].name + '">' + CUP_SVG + '<i>' + DOW_SHORT[d] + '</i></div>';
+    }
+    box.innerHTML = html + '</div>';   // только свои константы и числа
+  }
+
+  function showStart() {
+    var day = loadDay();
+    if (attemptsLeft(day) === 0) { showLimit(day); return; }
+    var dow = new Date().getDay(), plan = planRound(0, 1, dow), drink = plan.drink, i, liq, pearls = false;
+    el.dailyName.textContent = drink.name;
+    el.dailyStars.textContent = starsText(drink.stars);
+    for (i = 0; i < el.heroLayers.length; i++) {       // стакан на старте — в цветах напитка дня
+      liq = liquidOf(plan.ings, i);
+      el.heroLayers[i].style.fill = css[liq.pal + (i === 1 ? 'Bot' : 'Top')];
+      if (plan.ings[i].solid && plan.ings[i].solid.kinds[0] === 'pearl') pearls = true;
+    }
+    el.heroPearls.style.display = pearls ? '' : 'none';
+    if (WINTER && drink.hot) el.app.classList.add('is-hot'); else el.app.classList.remove('is-hot');
+    el.rule.textContent = 'Зажми — льётся, отпусти — стоп. Три слоя — три черты. ' +
+      PRIZE_TOPPING + ' очков — топпинг в подарок, ' + PRIZE_DRINK + ' — напиток в подарок.';
+    renderProfile(el.profileStart);
+    el.startRecord.textContent = day.top > 0 ? 'Твой рекорд: ' + day.top + ' из ' + MAX_SCORE : 'Рекорда пока нет';
+    el.startAttempts.textContent = store.ok
+      ? 'Попыток сегодня: ' + attemptsLeft(day) + ' из ' + ATTEMPTS_PER_DAY
+      : 'Попытки не ограничены: браузер не сохраняет счётчик';
+    el.protoStart.hidden = !IS_PROTOTYPE;
+    show('start');
+    el.screens.start.scrollTop = 0;
+  }
+
+  // ПРИЗОВОЙ БИЛЕТ: слово дня для кассы, живые дата и время. Зимой — открытка с лентой и ёлочным шаром (CSS).
+  var PRIZE_TEXT = {
+    topping: { title: 'Топпинг в подарок', sub: 'К любому напитку' },
+    drink: { title: 'Напиток в подарок', sub: 'К любой покупке' }
+  };
+  var DECO_SVG = '<svg class="ticket-deco ticket-bow" viewBox="0 0 36 30" aria-hidden="true">' +
+    '<path d="M18 15 C10 2 1 4 3 13 C4 22 12 22 18 15 Z M18 15 C26 2 35 4 33 13 C32 22 24 22 18 15 Z" fill="#DC223C" stroke="#B8162E" stroke-width="1.2"/>' +
+    '<path d="M18 15 L11 28 M18 15 L25 28" stroke="#DC223C" stroke-width="4" stroke-linecap="round"/>' +
+    '<circle cx="18" cy="15" r="4" fill="#F0445C" stroke="#B8162E" stroke-width="1.2"/></svg>' +
+    '<svg class="ticket-deco ticket-ball" viewBox="0 0 22 44" aria-hidden="true"><path d="M11 0 V18" stroke="#B9A98C" stroke-width="1.4"/>' +
+    '<rect x="8" y="16" width="6" height="5" rx="1.5" fill="#E9B81F"/><circle cx="11" cy="31" r="10.5" fill="#1B8F8E"/>' +
+    '<path d="M2.5 28 Q11 33 19.5 28" stroke="#FFD45C" stroke-width="2" fill="none"/><circle cx="7.5" cy="27" r="2.6" fill="#fff" opacity=".7"/></svg>';
+  function fillTicket(box, prize) {
+    var words = prize === 'drink' ? WORDS_DRINK : WORDS_TOPPING;
+    box.innerHTML = (IS_PROTOTYPE ? '<div class="ticket-tag">прототип</div>' : '') + DECO_SVG +
+      '<div class="ticket-main">На кассе назови номер телефона и&nbsp;слово дня</div>' +
+      '<div class="ticket-word" data-wk="' + (prize === 'drink' ? 'drink' : 'topping') + '" data-dow="' + new Date().getDay() + '"></div><div class="ticket-one">Один приз в день на гостя</div>' +
+      '<div class="ticket-stamp"></div>';                         // только свои константы
+    box.querySelector('.ticket-word').textContent = words[new Date().getDay()] || '';
+    box.hidden = false;
+  }
+  function stampText() {
+    var d = new Date();
+    return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear() + ' · ' +
+      pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+  // дата и время идут «вживую», чтобы скриншот старел
+  function startStamp() {
+    function tick() {
+      var s = stampText(), list = el.app.querySelectorAll('.ticket-stamp'), i;
+      for (i = 0; i < list.length; i++) list[i].textContent = s;
+    }
+    if (stampTimer) clearInterval(stampTimer);
+    tick();
+    stampTimer = setInterval(tick, 1000);
+  }
+  function showLimit(day) {
+    var prize = prizeOf(day.best);
+    el.limitRecord.textContent = 'Рекорд дня: ' + day.best + ' из ' + MAX_SCORE;
+    el.limitPrize.hidden = !prize;
+    el.ticketLimit.hidden = !prize;
+    if (prize) {
+      el.limitPrize.innerHTML = PRIZE_TEXT[prize].title + '<small>' + PRIZE_TEXT[prize].sub + '</small>';   // только свои константы
+      fillTicket(el.ticketLimit, prize);
+    } else {
+      el.ticketLimit.innerHTML = '';
+    }
+    renderProfile(el.profileLimit);
+    show('limit');
+    if (prize) startStamp();
+    el.screens.limit.scrollTop = 0;
+  }
+  function showResult(g, total, day, isRecord) {
+    var prize = prizeOf(total), left = attemptsLeft(day), miss = PRIZE_TOPPING - total, i, html = '', title;
+    var root = el.screens.result;
+    if (prize) { root.classList.add('win'); root.classList.remove('lose'); }
+    else { root.classList.add('lose'); root.classList.remove('win'); }
+    if (prize) title = PRIZE_TEXT[prize].title;
+    else if (miss > 100) title = 'Попробуй ещё: рука привыкнет';
+    else title = 'Почти. До топпинга не хватило ' + miss;
+    el.resTitle.textContent = title;
+    el.resSub.textContent = prize ? PRIZE_TEXT[prize].sub : '';
+    el.resMax.textContent = 'из ' + MAX_SCORE;
+    el.resDrink.textContent = g.drink.name + ' · ' + starsText(g.drink.stars);
+    for (i = 0; i < SLOTS.length; i++) {
+      html += '<div' + (g.scores[i] === LAYER_MAX ? ' class="is-100"' : '') + '><span>' + g.ings[i].chip + '</span><b>' + (g.scores[i] || 0) + '</b></div>';
+    }
+    el.resRows.innerHTML = html;   // только свои константы и числа
+    if (prize) fillTicket(el.ticket, prize); else { el.ticket.hidden = true; el.ticket.innerHTML = ''; }
+    var note = '';
+    if (g.spilled) {
+      note = g.idx < SLOTS.length - 1 ? 'Пролилось через край — остальные слои не поместились.' : 'Пролилось через край — слой не засчитан.';
+    } else if (isRecord) {
+      note = 'Новый рекорд!';
+    }
+    el.resNote.textContent = note;
+    el.resNote.className = 'note' + (isRecord && !g.spilled ? ' strong' : '');
+    if (left === 0) {
+      el.again.hidden = true;
+      el.home.textContent = 'Дальше';
+      el.resLeft.textContent = 'На сегодня всё. Завтра новый напиток.';
+    } else {
+      el.again.hidden = false;
+      el.again.textContent = prize ? 'Сыграть ещё' : 'Ещё раз';
+      el.again.className = prize ? 'btn ghost' : 'btn';   // на призовом экране главное — билет, а не кнопка
+      el.home.textContent = 'На старт';
+      el.resLeft.textContent = left > 0 ? 'Осталось попыток сегодня: ' + left : '';
+    }
+    show('result');
+    countUp(el.resScore, 0, total, 900);                  // счёт «набегает»
+    if (prize) {
+      startStamp();
+      el.app.classList.add('party');                      // зимой гирлянда загорается ярче
+      celebrate(prize);                                   // салют: конфетти в фирменных цветах, зимой ещё и снежинки
+      buzz([30, 60, 30, 60, 80]);
+    }
+    el.screens.result.scrollTop = 0;
+  }
+  var toastTimer = 0;
+  function toast(text) {
+    el.toast.textContent = text;
+    el.toast.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.toast.classList.remove('on'); }, 2200);
+  }
+
+  /* =====================================================================
+     ПОВЕРХ ЭКРАНОВ (canvas #fx): снег вне игры (зима) и салют на призовом экране.
+     Свой цикл; останавливается сам, когда рисовать нечего.
+     ===================================================================== */
+  var fx = { x: el.fx.getContext('2d'), w: 0, h: 0, d: 1, run: false, last: 0, snow: [], conf: [], t: 0 };
+  var FX_SNOW = RM ? 10 : 30, FX_CONF_MAX = RM ? 30 : 150;
+  function fxSize() {
+    var w = el.app.clientWidth, h = el.app.clientHeight, d = Math.max(1, Math.min(2, window.devicePixelRatio || 1)), i;
+    if (w < 2 || h < 2) return false;
+    if (w !== fx.w || h !== fx.h || d !== fx.d) {
+      fx.w = w; fx.h = h; fx.d = d;
+      el.fx.width = Math.round(w * d); el.fx.height = Math.round(h * d);
+      fx.snow.length = 0;
+      for (i = 0; i < FX_SNOW; i++) {
+        fx.snow.push({ x: fxRnd() * w, y: fxRnd() * h, r: 1 + fxRnd() * 2.2, vy: 16 + fxRnd() * 30, ph: fxRnd() * PI2 });
+      }
+    }
+    return true;
+  }
+  function fxNeeded() { return (WINTER && screen !== 'game') || fx.conf.length > 0; }
+  function fxKick() {
+    if (fx.run) return;
+    if (!fxSize()) return;
+    if (!fxNeeded()) { fx.x.setTransform(1, 0, 0, 1, 0, 0); fx.x.clearRect(0, 0, el.fx.width, el.fx.height); return; }
+    fx.run = true; fx.last = nowMs();
+    window.requestAnimationFrame(fxFrame);
+  }
+  function drawFlake(c, x, y, r, rot) {             // шестилучевая снежинка
+    var i, a;
+    c.beginPath();
+    for (i = 0; i < 3; i++) {
+      a = rot + i * Math.PI / 3;
+      c.moveTo(x - Math.cos(a) * r, y - Math.sin(a) * r); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    c.stroke();
+  }
+  function fxFrame() {
+    var c = fx.x, now = nowMs(), dt = Math.min(0.05, Math.max(0, (now - fx.last) / 1000)), i, p, a;
+    fx.last = now; fx.t += dt;
+    c.setTransform(fx.d, 0, 0, fx.d, 0, 0);
+    c.clearRect(0, 0, fx.w, fx.h);
+    if (document.hidden || !fxNeeded()) { fx.run = false; return; }
+    if (WINTER && screen !== 'game') {              // редкий снег поверх экранов
+      c.fillStyle = '#FFFFFF';
+      for (i = 0; i < fx.snow.length; i++) {
+        p = fx.snow[i];
+        p.y += p.vy * dt;
+        if (!RM) p.x += Math.sin(p.ph + fx.t * 0.9) * 10 * dt;
+        if (p.y > fx.h + 4) { p.y = -4; p.x = fxRnd() * fx.w; }
+        c.globalAlpha = 0.35 + p.r * 0.17;
+        c.beginPath(); c.arc(p.x, p.y, p.r, 0, PI2); c.fill();
+      }
+    }
+    for (i = fx.conf.length - 1; i >= 0; i--) {     // салют: конфетти и снежинки
+      p = fx.conf[i];
+      if (p.wait > 0) { p.wait -= dt; continue; }
+      p.vy += 520 * dt; a = Math.exp(-1.6 * dt); p.vx *= a; p.vy *= a;
+      p.x += (p.vx + Math.sin(p.ph + fx.t * 3) * 30) * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= dt;
+      if (p.life <= 0 || p.y > fx.h + 20) { fx.conf.splice(i, 1); continue; }
+      c.globalAlpha = Math.min(1, p.life / 0.5);
+      if (p.flake) {
+        c.strokeStyle = '#FFFFFF'; c.lineWidth = 1.6; c.lineCap = 'round';
+        drawFlake(c, p.x, p.y, p.s * 1.3, p.rot);
+      } else {
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.scale(1, Math.cos(p.rot * 2.3));
+        c.fillStyle = p.c; c.fillRect(-p.s, -p.s * 0.45, p.s * 2, p.s * 0.9);
+        c.restore();
+      }
+    }
+    c.globalAlpha = 1;
+    window.requestAnimationFrame(fxFrame);
+  }
+  // Салют на призовом экране: три залпа конфетти в фирменных цветах; зимой каждая третья частица — снежинка
+  function celebrate(prize) {
+    var cols = [css.brand, css.accent, css.sun, css.mint, '#FFFFFF'];
+    var pts = [[0.5, 0.3, 0], [0.2, 0.38, 0.35], [0.8, 0.38, 0.7]];
+    var n = RM ? 8 : (prize === 'drink' ? 44 : 30), k, i, a, v;
+    if (!fxSize()) return;
+    for (k = 0; k < pts.length; k++) {
+      for (i = 0; i < n && fx.conf.length < FX_CONF_MAX; i++) {
+        a = fxRnd() * PI2; v = 160 + fxRnd() * 420;
+        fx.conf.push({
+          x: pts[k][0] * fx.w, y: pts[k][1] * fx.h, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 220,
+          rot: fxRnd() * PI2, vr: (fxRnd() - 0.5) * 12, s: 3 + fxRnd() * 4, c: cols[i % cols.length],
+          life: 2.4 + fxRnd() * 1.2, wait: pts[k][2], ph: fxRnd() * PI2, flake: WINTER && i % 3 === 0
+        });
+      }
+    }
+    fxKick();
+  }
+
+  /* =====================================================================
+     ИГРА: состояние и логика
+     Состояния слоя: intro -> ready -> pouring -> settle -> (следующий слой | результат)
+                     pouring -> spill -> результат (перелив)
+     ===================================================================== */
+  var game = null;
+  var fxRnd = mulberry32(20261116);     // только косметика (разлёт брызг, снег), на очки не влияет
+
+  // Сцена: всё, что живёт между кадрами и на очки не влияет
+  var cup = { sq: 0, sqv: 0, hop: 0, hopv: 0, shake: 0, fog: 0, glow: 0 };   // отклик стакана
+  var SP_N = 25, spH = [], spV = [];    // поверхность жидкости: столбики на пружинах
+  var bodies = [];                      // твёрдые тела: тапиока, фасоль, желе, лёд, лимон, Oreo
+  var parts = [];                       // брызги, искры, снежная пыль
+  var bubbles = [];                     // пузырьки в жидкости
+  var foam = [];                        // пена на поверхности молочных слоёв
+  var steam = [];                       // пар над горячим напитком (зима)
+  var flakes = [];                      // снег на сцене (зима): три слоя с параллаксом
+  var filmFlakes = [];                  // снежинки, осевшие на плёнке (зима)
+  var garland = [];                     // лампочки гирлянды (зима)
+  var par = { x: 0, y: 0, tx: 0, ty: 0 };   // параллакс: -1..1, за пальцем или наклоном
+  var MAX_BODIES = 46;
+  var MAX_PARTS = RM ? 50 : 140, MAX_BUBBLES = RM ? 8 : 22, MAX_FOAM = RM ? 12 : 34, MAX_STEAM = RM ? 5 : 12;
+  var SNOW_COUNT = RM ? [8, 4, 2] : [26, 16, 7];   // снежинок в слоях: дальний, средний, ближний
+  function resetScene() {
+    var i;
+    cup.sq = cup.sqv = cup.hop = cup.hopv = cup.shake = cup.fog = cup.glow = 0;
+    for (i = 0; i < SP_N; i++) { spH[i] = 0; spV[i] = 0; }
+    bodies.length = parts.length = bubbles.length = foam.length = steam.length = filmFlakes.length = 0;
+  }
+
+  function newGame(dateInt, attemptNo, dow) {
+    var g = planRound(dateInt, attemptNo, dow), i;
+    g.scores = [];
+    for (i = 0; i < SLOTS.length; i++) g.scores.push(null);
+    g.idx = 0;             // номер текущего слоя
+    g.level = 0;           // текущий уровень жидкости
+    g.bounds = [0];        // границы уже налитых слоёв
+    g.state = 'intro';
+    g.stateStart = nowMs();
+    g.pourT = 0;           // сколько секунд льём текущий слой
+    g.lastPour = 0;        // момент последнего шага налива
+    g.spilled = false;
+    g.time = 0;
+    g.flash = null;        // кольцо-вспышка на черте при «идеально»
+    g.seal = null;         // момент, когда стакан начали запаивать плёнкой (после третьего слоя)
+    g.hot = WINTER && !!g.drink.hot;   // зимой напитки, которые в меню бывают горячими, подаём с паром
+    g.sum = 0;             // счёт, показанный в шапке
+    g.spawned = 0;         // сколько тел высыпано в текущем слое
+    g.pourAt = -9;         // когда открыли струю (по g.time)
+    g.cutAt = -9;          // когда струю перекрыли
+    g.emit = 0; g.steamT = 0; g.filmT = 0;
+    return g;
+  }
+
+  function setState(s) {
+    game.state = s;
+    game.stateStart = nowMs();
+    renderHud();
+  }
+  function renderHud() {
+    var g = game, i, sum = 0, sc, hint = '';
+    for (i = 0; i < SLOTS.length; i++) {
+      sc = g.scores[i];
+      el.chips[i].b.textContent = sc === null ? '—' : String(sc);
+      el.chips[i].root.className = 'chip' + (sc !== null ? ' is-done' : (i === g.idx ? ' is-now' : ''));
+      if (sc !== null) sum += sc;
+    }
+    if (sum !== g.sum) {                           // счёт «набегает», плашка подпрыгивает
+      countUp(el.sum, g.sum, sum, 450);
+      g.sum = sum;
+      el.chipSum.classList.remove('bump');
+      void el.chipSum.offsetWidth;
+      el.chipSum.classList.add('bump');
+    }
+    if (g.state === 'intro') hint = 'Приготовься…';
+    else if (g.state === 'ready') hint = 'Зажми и держи';
+    else if (g.state === 'pouring') hint = 'Отпусти у черты!';
+    el.hint.textContent = hint;
+    el.hint.className = 'hint' + (g.state === 'ready' ? ' pulse' : '');
+    el.caption.className = 'caption' + (g.state === 'intro' ? ' on' : '');
+  }
+
+  function startRound() {
+    if (screen === 'game') return;
+    var day = loadDay(), now = new Date(), i;
+    if (attemptsLeft(day) === 0) { showLimit(day); return; }
+    day.used += 1;                 // попытка считается в момент старта, перезагрузка её не вернёт
+    saveDay(day);
+    writeProfile(touchStreak(readProfile(), day.date));   // игровой день засчитан — серия
+    resetScene();
+    game = newGame(dateIntOf(day.date), day.used, now.getDay());
+    for (i = 0; i < SLOTS.length; i++) el.chips[i].i.textContent = game.ings[i].chip;
+    countUp(el.sum, 0, 0, 0);
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) { /* не критично */ }
+    show('game');
+    G = null;                      // сцену собираем заново: иней и манжета зависят от напитка
+    layout();
+    beginLayer();
+    startLoop();
+  }
+  function beginLayer() {
+    var g = game;
+    el.capStep.textContent = 'Слой ' + (g.idx + 1) + ' из ' + SLOTS.length;
+    el.capText.textContent = g.caps[g.idx] || '';
+    el.pop.className = 'pop';
+    g.pourT = 0;
+    setState('intro');
+  }
+  function startPour() {
+    var g = game;
+    if (!g || screen !== 'game' || g.state !== 'ready' || !G) return;
+    g.pourT = 0;
+    g.lastPour = nowMs();
+    g.pourAt = g.time; g.cutAt = -9; g.spawned = 0; g.emit = 0;
+    if (!g.ings[g.idx].solid) foam.length = 0;   // новая жидкость — старая пена ушла
+    cup.sqv = -0.9;                              // стакан чуть приседает под струёй
+    buzz(8);
+    setState('pouring');
+  }
+  // Шаг налива до момента now. Вызывается и из кадра, и в момент отпускания,
+  // поэтому результат не зависит от частоты экрана (60 или 120 Гц).
+  function advancePour(now) {
+    var g = game;
+    var dt = (now - g.lastPour) / 1000;
+    if (dt <= 0) return;
+    if (dt > 0.1) dt = 0.1;                      // защита от подвисания вкладки
+    g.lastPour = now;
+    // скорость в середине шага
+    g.level += pourSpeed(g.idx, g.pourT + dt / 2, g.speedK[g.idx], g.diff, g.mods[g.idx]) * dt;
+    g.pourT += dt;
+    if (g.level >= 1) { g.level = 1; spill(); }
+  }
+  function stopPour() {
+    var g = game;
+    if (!g || g.state !== 'pouring') return;
+    advancePour(nowMs());
+    if (g.state === 'pouring') endLayer();
+  }
+  function endLayer() {
+    var g = game, target = g.targets[g.idx];
+    var score = scoreFor(g.level, target, false, g.diff.perfect, g.diff);
+    g.scores[g.idx] = score;
+    g.bounds.push(g.level);
+    g.cutAt = g.time;
+    el.popScore.textContent = '+' + score;
+    el.popText.textContent = verdict(score, g.level, target, false);
+    el.pop.className = 'pop on' + (score === LAYER_MAX ? ' perfect' : (score < 30 ? ' bad' : ''));
+    kickSurface(G.cx, -50 * G.unit);             // струя оборвалась — поверхность качнулась
+    if (score === LAYER_MAX) {                   // идеально: кольцо на черте, стакан подпрыгивает
+      g.flash = { t: g.time, f: target };
+      if (!RM) cup.hopv = -340 * G.unit;
+      cup.sqv = 2.4; cup.glow = 1;
+      cheer(target, 2);
+      buzz([18, 40, 18]);
+    } else if (score >= 88) {
+      cup.sqv = 1.5; cup.glow = 0.5;
+      cheer(target, 1);
+      buzz(12);
+    } else if (score < 40) {
+      cup.sqv = -1.2;
+      if (WINTER) cup.fog = 1;                   // зимой при промахе стекло на миг запотевает
+    } else {
+      cup.sqv = 0.8;
+    }
+    if (g.idx === SLOTS.length - 1) g.seal = g.time + 0.35;   // последний слой налит — запаиваем плёнкой
+    setState('settle');
+  }
+  function spill() {
+    var g = game, i;
+    g.spilled = true;
+    for (i = g.idx; i < SLOTS.length; i++) g.scores[i] = 0;   // пролитый слой и те, что не поместились
+    g.bounds.push(1);
+    g.cutAt = g.time;
+    el.popScore.textContent = '+0';
+    el.popText.textContent = verdict(0, 1, g.targets[g.idx], true);
+    el.pop.className = 'pop on bad';
+    splash();
+    cup.shake = RM ? 0 : 1;                      // камера вздрагивает
+    cup.sqv = -1.6;
+    if (WINTER) cup.fog = 1;
+    buzz([70, 40, 70]);
+    setState('spill');
+  }
+  function nextLayer() {
+    var g = game, j;
+    g.idx += 1;
+    if (g.idx >= SLOTS.length) { finishRound(); return; }
+    g.targets[g.idx] = fitTarget(g.targets[g.idx], g.level);
+    for (j = g.idx + 1; j < SLOTS.length; j++) g.targets[j] = fitTarget(g.targets[j], g.targets[j - 1]);
+    beginLayer();
+  }
+  function finishRound() {
+    var g = game, total = 0, i;
+    for (i = 0; i < SLOTS.length; i++) total += g.scores[i] || 0;
+    var day = loadDay();
+    var isRecord = total > 0 && total > day.top;
+    if (total > day.best) day.best = total;
+    if (total > day.top) day.top = total;
+    saveDay(day);
+    writeProfile(addToCollection(readProfile(), g.dow, total));   // счёт напитка дня — в общую коллекцию
+    stopLoop();
+    showResult(g, total, day, isRecord);
+  }
+
+  /* =====================================================================
+     ЦИКЛ: requestAnimationFrame с дельтой времени
+     ===================================================================== */
+  var running = false, rafId = 0, lastFrame = 0;
+  function startLoop() {
+    if (running) return;
+    running = true;
+    lastFrame = nowMs();
+    rafId = window.requestAnimationFrame(frame);
+  }
+  function stopLoop() {
+    running = false;
+    if (rafId) window.cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+  function frame() {
+    if (!running) return;
+    var now = nowMs(), dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (dt < 0) dt = 0;
+    if (dt > 0.05) dt = 0.05;
+    update(now, dt);
+    if (!running) return;
+    draw();
+    rafId = window.requestAnimationFrame(frame);
+  }
+  function update(now, dt) {
+    var g = game, since = now - g.stateStart;
+    g.time += dt;
+    if (g.state === 'intro') { if (since >= INTRO_MS) setState('ready'); }
+    else if (g.state === 'pouring') { advancePour(now); }
+    else if (g.state === 'settle') { if (since >= (g.idx === SLOTS.length - 1 ? FINAL_MS : SETTLE_MS)) nextLayer(); }
+    else if (g.state === 'spill') { if (since >= SPILL_MS) finishRound(); }
+    if (!running || !G) return;
+    stepScene(dt);
+  }
+
+  /* =====================================================================
+     СЦЕНА: отклик стакана, пружинная поверхность, тела, частицы. На очки не влияет.
+     ===================================================================== */
+  function addPart(p) { if (parts.length < MAX_PARTS) { p.max = p.life; parts.push(p); } }
+  function stepScene(dt) {
+    var g = game, U = G.unit, slot = Math.min(g.idx, SLOTS.length - 1), ing = g.ings[slot];
+    var pouring = g.state === 'pouring', sy = Y(g.level), i, p, k;
+    par.x += (par.tx - par.x) * Math.min(1, dt * 6);
+    par.y += (par.ty - par.y) * Math.min(1, dt * 6);
+    // стакан: сжатие-растяжение на пружине, прыжок с отскоком, затухание тряски
+    cup.sqv += (-240 * cup.sq - 12 * cup.sqv) * dt;
+    cup.sq = clamp(cup.sq + cup.sqv * dt, -0.1, 0.1);
+    if (cup.hop < 0 || cup.hopv < 0) {
+      cup.hopv += 2600 * U * dt;
+      cup.hop += cup.hopv * dt;
+      if (cup.hop >= 0) {
+        cup.hop = 0;
+        if (cup.hopv > 120 * U) { cup.sqv = -2.2; cup.hopv = -cup.hopv * 0.32; kickSurface(G.cx, 60 * U); }
+        else cup.hopv = 0;
+      }
+    }
+    cup.shake = Math.max(0, cup.shake - dt * 2.2);
+    cup.fog = Math.max(0, cup.fog - dt * 1.3);
+    cup.glow = Math.max(0, cup.glow - dt * 0.9);
+    // струя жидкости: давит на поверхность, даёт брызги, пузырьки и пену
+    if (pouring && !ing.solid && g.time - g.pourAt > 0.07) {
+      kickSurface(G.cx, (ing.thick ? 5000 : 9000) * U * (1 + 0.6 * Math.sin(g.time * 31)) * wobbleAt(g.pourT, g.mods[g.idx]) * dt);
+      g.emit += dt;
+      while (g.emit > 0.045) {
+        g.emit -= 0.045;
+        if (!ing.thick) {
+          addPart({ k: 0, x: G.cx + (fxRnd() - 0.5) * 10 * U, y: sy - 2, vx: (fxRnd() - 0.5) * 150 * U, vy: -(60 + fxRnd() * 150) * U,
+            r: (1.2 + fxRnd() * 1.8) * U, c: css[ing.pal + 'Top'], g: 900 * U, life: 0.7 });
+        }
+        if (ing.bubbly && bubbles.length < MAX_BUBBLES) {
+          bubbles.push({ x: G.cx + (fxRnd() - 0.5) * 24 * U, y: Math.min(G.bottom - 6, sy + (8 + fxRnd() * 40) * U),
+            r: (1.2 + fxRnd() * 2.2) * U, vy: (30 + fxRnd() * 50) * U, ph: fxRnd() * PI2 });
+        }
+        if (ing.milky && foam.length < MAX_FOAM && fxRnd() < 0.8) {
+          k = 1.4 + fxRnd() * 2.2;
+          foam.push({ u: (fxRnd() - 0.5) * 0.3, du: (fxRnd() < 0.5 ? -1 : 1) * (0.25 + fxRnd() * 0.5), r: (1.6 + fxRnd() * 2.6) * U, life: k, max: k });
+        }
+      }
+    }
+    if (pouring && ing.solid) feedBodies(g, ing.solid);   // твёрдый слой сыплется по мере роста уровня
+    stepSurface(dt, ing.thick && !ing.solid);
+    stepBodies(dt);
+    for (i = parts.length - 1; i >= 0; i--) {
+      p = parts[i];
+      p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+      if (p.k === 0 && p.vy > 0 && p.y > sy && p.y < sy + 16 * U && Math.abs(p.x - G.cx) < halfW(g.level) - 2) p.life = 0;   // капля упала обратно
+      if (p.life <= 0 || p.y > H + 20) parts.splice(i, 1);
+    }
+    for (i = bubbles.length - 1; i >= 0; i--) {
+      p = bubbles[i];
+      p.y -= p.vy * dt; p.x += Math.sin(p.ph + g.time * 6) * 10 * U * dt;
+      if (p.y - p.r < sy + 1) { bubbles.splice(i, 1); kickSurface(p.x, -6 * U); }
+    }
+    for (i = foam.length - 1; i >= 0; i--) {
+      p = foam[i];
+      p.life -= dt; p.u += p.du * dt * (1 - Math.abs(p.u));
+      if (p.life <= 0) foam.splice(i, 1);
+    }
+    if (g.hot && g.level > 0.03 && g.seal === null && !g.spilled) {   // пар над горячим
+      g.steamT += dt;
+      if (g.steamT > (RM ? 0.5 : 0.2) && steam.length < MAX_STEAM) {
+        g.steamT = 0; k = 2.2 + fxRnd();
+        steam.push({ x: G.cx + (fxRnd() - 0.5) * halfW(g.level) * 1.5, y: sy - 2 * U, vy: (20 + fxRnd() * 22) * U, r: (12 + fxRnd() * 10) * U, life: k, max: k, ph: fxRnd() * PI2 });
+      }
+    }
+    for (i = steam.length - 1; i >= 0; i--) {
+      p = steam[i];
+      p.y -= p.vy * dt; p.x += Math.sin(p.ph + g.time * 1.3) * 8 * U * dt; p.life -= dt;
+      if (p.life <= 0) steam.splice(i, 1);
+    }
+    if (WINTER) stepSnow(dt);
+  }
+  // Поверхность: столбики на пружинах, волна бежит к соседям и гаснет. h > 0 — вниз.
+  function surfIdx(x) { return clamp((x - (G.cx - G.tw / 2)) / G.tw * (SP_N - 1), 0, SP_N - 1); }
+  function surfOff(x) {
+    var f = surfIdx(x), i = Math.floor(f), k = f - i;
+    return i >= SP_N - 1 ? spH[SP_N - 1] : spH[i] * (1 - k) + spH[i + 1] * k;
+  }
+  function kickSurface(x, v) {
+    var i = Math.round(surfIdx(x));
+    spV[i] += v;
+    if (i > 0) spV[i - 1] += v * 0.5;
+    if (i < SP_N - 1) spV[i + 1] += v * 0.5;
+  }
+  function stepSurface(dt, thick) {
+    var n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n, lim = 7 * G.unit, damp = thick ? 8 : 3.2, s, i, lap;
+    for (s = 0; s < n; s++) {
+      for (i = 0; i < SP_N; i++) {
+        lap = (i > 0 ? spH[i - 1] : spH[i]) + (i < SP_N - 1 ? spH[i + 1] : spH[i]) - 2 * spH[i];
+        spV[i] += (-150 * spH[i] - damp * spV[i] + 1300 * lap) * h;
+      }
+      for (i = 0; i < SP_N; i++) spH[i] = clamp(spH[i] + spV[i] * h, -lim, lim);
+    }
+  }
+
+  // ТВЁРДЫЕ ТЕЛА: круги с гравитацией, выталкиванием из жидкости, отскоком от стенок и друг от друга
+  function spawnBody(sol, kind) {
+    var r = sol.r * G.h * (0.92 + fxRnd() * 0.16);
+    bodies.push({ kind: kind, r: r, rho: sol.rho, x: G.cx + (fxRnd() - 0.5) * 30 * G.unit, y: -r - fxRnd() * 26,
+      vx: (fxRnd() - 0.5) * 60 * G.unit, vy: ((sol.rho > 1 ? 560 : 380) + fxRnd() * 160) * G.unit, rot: fxRnd() * PI2, vr: (fxRnd() - 0.5) * 8, wet: false });
+  }
+  function feedBodies(g, sol) {
+    var from = g.bounds[g.idx], fm = (from + g.level) / 2;
+    var want = 1 + Math.floor((g.level - from) * 2 * halfW(fm) * sol.fill / (Math.PI * sol.r * sol.r * G.h));
+    while (g.spawned < want && bodies.length < MAX_BODIES) {
+      spawnBody(sol, sol.kinds[g.spawned % sol.kinds.length]);
+      g.spawned += 1;
+    }
+  }
+  function plop(b) {                                // тело вошло в жидкость: всплеск и пара капель
+    var U = G.unit, liq = liquidOf(game.ings, Math.min(game.idx, SLOTS.length - 1)), i;
+    kickSurface(b.x, 55 * U * b.r / (0.03 * G.h));
+    for (i = 0; i < (RM ? 0 : 2); i++) {
+      addPart({ k: 0, x: b.x, y: b.y - b.r, vx: (fxRnd() - 0.5) * 120 * U, vy: -(50 + fxRnd() * 110) * U, r: (1 + fxRnd() * 1.5) * U, c: css[liq.pal + 'Top'], g: 900 * U, life: 0.6 });
+    }
+  }
+  // Стенки (наклонные), дно со скруглёнными углами
+  function confine(b, nx, ny) {
+    var d, p, vn, fy, dx, rc = G.bw * 0.16;
+    d = (b.x - (G.cx - G.tw / 2)) * nx - (b.y - G.top) * ny - 2.5;
+    if (d < b.r) {
+      p = b.r - d; b.x += nx * p; b.y -= ny * p;
+      vn = b.vx * nx - b.vy * ny;
+      if (vn < 0) { b.vx -= 1.3 * vn * nx; b.vy += 1.3 * vn * ny; }
+    }
+    d = ((G.cx + G.tw / 2) - b.x) * nx - (b.y - G.top) * ny - 2.5;
+    if (d < b.r) {
+      p = b.r - d; b.x -= nx * p; b.y -= ny * p;
+      vn = -b.vx * nx - b.vy * ny;
+      if (vn < 0) { b.vx += 1.3 * vn * nx; b.vy += 1.3 * vn * ny; }
+    }
+    fy = G.bottom - 3;
+    dx = Math.min(rc, Math.abs(b.x - G.cx) - (G.bw / 2 - rc));
+    if (dx > 0) fy -= rc - Math.sqrt(rc * rc - dx * dx);
+    if (b.y + b.r > fy) {
+      b.y = fy - b.r;
+      if (b.vy > 0) b.vy = -b.vy * 0.25;
+      b.vx *= 0.9; b.vr *= 0.8;
+    }
+  }
+  function stepBodies(dt) {
+    var n = bodies.length;
+    if (!n) return;
+    var g = game, sub = dt > 0.012 ? 2 : 1, h = dt / sub, grav = 2000 * G.unit, yl = Y(g.level);
+    var wl = Math.sqrt(G.h * G.h + (G.tw - G.bw) * (G.tw - G.bw) / 4), nx = G.h / wl, ny = (G.tw - G.bw) / 2 / wl;
+    var s, i, j, it, b, c, subm, k, dx, dy, rr, d2, d, ux, uy, p, vn;
+    for (s = 0; s < sub; s++) {
+      for (i = 0; i < n; i++) {
+        b = bodies[i];
+        subm = g.level > 0.001 ? clamp((b.y + b.r - yl - surfOff(b.x)) / (2 * b.r), 0, 1) : 0;
+        b.vy += grav * (1 - subm / b.rho) * h;
+        if (subm > 0) {                            // в жидкости: вязкость
+          k = Math.exp(-(b.rho > 1 ? 2.6 : 8) * subm * h);   // лёгкие тела вязнут сильнее: ныряют неглубоко и всплывают
+          b.vx *= k; b.vy *= k; b.vr *= k;
+          if (!b.wet && subm > 0.3) { b.wet = true; plop(b); }
+        }
+        b.x += b.vx * h; b.y += b.vy * h; b.rot += b.vr * h;
+        confine(b, nx, ny);
+      }
+      for (it = 0; it < 3; it++) {
+        for (i = 0; i < n; i++) {
+          b = bodies[i];
+          for (j = i + 1; j < n; j++) {
+            c = bodies[j];
+            dx = c.x - b.x; dy = c.y - b.y; rr = b.r + c.r;
+            if (dx > rr || dx < -rr || dy > rr || dy < -rr) continue;
+            d2 = dx * dx + dy * dy;
+            if (d2 >= rr * rr || d2 < 0.0001) continue;
+            d = Math.sqrt(d2); ux = dx / d; uy = dy / d; p = (rr - d) * 0.5;
+            b.x -= ux * p; b.y -= uy * p; c.x += ux * p; c.y += uy * p;
+            vn = (c.vx - b.vx) * ux + (c.vy - b.vy) * uy;
+            if (vn < 0) { vn *= 0.58; b.vx += ux * vn; b.vy += uy * vn; c.vx -= ux * vn; c.vy -= uy * vn; }
+          }
+        }
+      }
+      for (i = 0; i < n; i++) confine(bodies[i], nx, ny);
+    }
+  }
+
+  // ОТКЛИКИ
+  function cheer(f, power) {                        // удача: искры (зимой — как от бенгальского огня, плюс снежная пыль)
+    var U = G.unit, y = Y(f), hw = halfW(f), n = Math.round((power === 2 ? 26 : 10) * (RM ? 0.4 : 1)), i, a, v;
+    for (i = 0; i < n; i++) {
+      if (WINTER) {
+        a = fxRnd() * PI2; v = (90 + fxRnd() * 260) * U;
+        addPart({ k: 2, x: G.cx + (i % 2 ? 1 : -1) * hw * (0.2 + fxRnd() * 0.9), y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60 * U,
+          r: 1.4 * U, c: i % 3 ? css.sun : '#FFFFFF', g: 260 * U, life: 0.45 + fxRnd() * 0.45 });
+      } else {
+        addPart({ k: 1, x: G.cx + (fxRnd() * 2 - 1) * hw, y: y, vx: (fxRnd() - 0.5) * 190 * U, vy: -(70 + fxRnd() * 170) * U,
+          r: (2.4 + fxRnd() * 3) * U, c: css.sun, g: 460 * U, life: 0.9, rot: fxRnd() * PI2 });
+      }
+    }
+    if (!WINTER) return;
+    for (i = 0; i < n * 0.6; i++) {
+      addPart({ k: 3, x: G.cx + (fxRnd() * 2 - 1) * hw * 1.2, y: y + (fxRnd() - 0.5) * 10 * U, vx: (fxRnd() - 0.5) * 60 * U, vy: -(10 + fxRnd() * 50) * U,
+        r: (1 + fxRnd() * 1.6) * U, c: '#FFFFFF', g: 70 * U, life: 1.1 + fxRnd() * 0.6 });
+    }
+  }
+  function splash() {                               // перелив: брызги с обеих сторон кромки
+    var U = G.unit, liq = liquidOf(game.ings, game.idx), col = css[liq.pal + 'Top'], n = RM ? 12 : 34, i, side;
+    for (i = 0; i < n; i++) {
+      side = i % 2 ? 1 : -1;
+      addPart({ k: 0, x: G.cx + side * (G.tw / 2 + 2), y: G.top + 2, vx: side * (30 + fxRnd() * 130) * U, vy: -(40 + fxRnd() * 170) * U,
+        r: (2 + fxRnd() * 3.2) * U, c: col, g: 950 * U, life: 1.4 });
+    }
+    kickSurface(G.cx - G.tw * 0.3, -90 * U); kickSurface(G.cx + G.tw * 0.3, -90 * U);
+  }
+  // Снег на сцене (зима): три слоя — дальний, средний, ближний; ближний крупнее и быстрее
+  function initSnow() {
+    var L, i, slow = RM ? 0.6 : 1;
+    flakes.length = 0;
+    for (L = 0; L < 3; L++) {
+      for (i = 0; i < SNOW_COUNT[L]; i++) {
+        flakes.push({ L: L, x: fxRnd() * W, y: fxRnd() * H, r: [1, 1.6, 3][L] + fxRnd() * [0.8, 1, 1.6][L],
+          vy: ([18, 30, 60][L] + fxRnd() * [12, 18, 30][L]) * slow, ph: fxRnd() * PI2, w: 0.6 + fxRnd() * 0.8, a: [6, 10, 18][L] });
+      }
+    }
+  }
+  function stepSnow(dt) {
+    var g = game, i, p;
+    for (i = 0; i < flakes.length; i++) {
+      p = flakes[i];
+      p.y += p.vy * dt;
+      if (!RM) p.x += Math.sin(p.ph + g.time * p.w) * p.a * dt;
+      if (p.y > H + 6) { p.y = -6; p.x = fxRnd() * W; }
+    }
+    if (g.seal !== null && !g.spilled && g.time > g.seal + 0.5) {   // снежинки оседают на плёнке и тают
+      g.filmT += dt;
+      if (g.filmT > 0.22 && filmFlakes.length < 7) {
+        g.filmT = 0;
+        filmFlakes.push({ x: G.cx + (fxRnd() - 0.5) * G.tw * 0.9, t: g.time, r: (1.6 + fxRnd() * 1.6) * G.unit });
+      }
+    }
+    for (i = filmFlakes.length - 1; i >= 0; i--) if (g.time - filmFlakes[i].t > 1.5) filmFlakes.splice(i, 1);
+  }
+
+  /* =====================================================================
+     ГЕОМЕТРИЯ И ЗАГОТОВКИ: тяжёлое (фон, стекло, блики, иней, манжета, тела) рисуется один раз
+     на отдельных canvas, в кадре — только drawImage
+     ===================================================================== */
+  var W = 0, H = 0, dpr = 1, G = null;
+  var spr = { bg: null, back: null, front: null, ox: 0, oy: 0, glow: [], puff: null, body: {} };
+  var BG_M = 14;                                    // запас фона под параллакс, px
+  function layout() {
+    var w = el.stage.clientWidth, h = el.stage.clientHeight, old = G, s, i, b;
+    var d = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    if (w < 2 || h < 2 || !game) return;            // экран скрыт
+    if (G && spr.bg && w === W && h === H && d === dpr) return;   // размер тот же — заготовки уже собраны
+    W = w; H = h; dpr = d;
+    var cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+    if (el.canvas.width !== cw || el.canvas.height !== ch) { el.canvas.width = cw; el.canvas.height = ch; }
+    // стакан: сужается книзу, высота к верхней ширине 1,6; справа место под подписи к чертам
+    var gh = Math.max(110, Math.min(H * 0.6, (W - 150) * 1.6, 400));
+    var tw = gh / 1.6, bw = tw * 0.74;
+    var top = Math.max(64, (H - gh) / 2 + H * 0.04);
+    if (top + gh > H - 26) top = Math.max(40, H - 26 - gh);
+    G = { h: gh, tw: tw, bw: bw, cx: Math.round(W / 2 - (W < 340 ? 20 : 14)), top: top, bottom: top + gh, unit: gh / 300 };
+    if (old && bodies.length) {                     // поворот экрана посреди попытки: тела переезжают вместе со стаканом
+      s = G.h / old.h;
+      for (i = 0; i < bodies.length; i++) {
+        b = bodies[i];
+        b.x = G.cx + (b.x - old.cx) * s; b.y = G.bottom + (b.y - old.bottom) * s; b.r *= s;
+      }
+    }
+    buildSprites();
+    if (WINTER) initSnow();
+    if (!running && screen === 'game') draw();
+  }
+  function Y(f) { return G.bottom - f * G.h; }
+  function halfW(f) { return (G.bw + (G.tw - G.bw) * f) / 2; }
+  function glassPath() {
+    var r = G.bw * 0.16, f = r / G.h;
+    var xlB = G.cx - G.bw / 2, xrB = G.cx + G.bw / 2;
+    ctx.beginPath();
+    ctx.moveTo(G.cx - G.tw / 2, G.top);
+    ctx.lineTo(G.cx - halfW(f), G.bottom - r);
+    ctx.quadraticCurveTo(xlB, G.bottom, xlB + r, G.bottom);
+    ctx.lineTo(xrB - r, G.bottom);
+    ctx.quadraticCurveTo(xrB, G.bottom, G.cx + halfW(f), G.bottom - r);
+    ctx.lineTo(G.cx + G.tw / 2, G.top);
+  }
+  function ellipse(cx, cy, rx, ry) {
+    if (rx <= 0 || ry <= 0) return;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(rx, ry);
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, PI2); ctx.restore(); ctx.fill();
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  function dash(pattern) { if (ctx.setLineDash) ctx.setLineDash(pattern); }
+  function vGrad(y0, y1, stops) {                   // вертикальный градиент: [доля, цвет, ...]
+    var g = ctx.createLinearGradient(0, y0, 0, y1), i;
+    for (i = 0; i < stops.length; i += 2) g.addColorStop(stops[i], stops[i + 1]);
+    return g;
+  }
+  function lGrad(x0, y0, x1, y1, stops) {
+    var g = ctx.createLinearGradient(x0, y0, x1, y1), i;
+    for (i = 0; i < stops.length; i += 2) g.addColorStop(stops[i], stops[i + 1]);
+    return g;
+  }
+  function rGrad(x, y, r0, r1, stops) {
+    var g = ctx.createRadialGradient(x, y, r0, x, y, r1), i;
+    for (i = 0; i < stops.length; i += 2) g.addColorStop(stops[i], stops[i + 1]);
+    return g;
+  }
+  function mk(w, h) {
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(w * dpr)); c.height = Math.max(1, Math.ceil(h * dpr));
+    return { c: c, x: c.getContext('2d'), w: w, h: h };
+  }
+  function paint(s, ox, oy, fn) {                   // рисуем в заготовку теми же функциями, что и на экран
+    var keep = ctx;
+    ctx = s.x;
+    ctx.setTransform(dpr, 0, 0, dpr, -ox * dpr, -oy * dpr);
+    try { fn(); } finally { ctx = keep; }
+  }
+  function buildSprites() {
+    var pad = 18, cols = [css.sun, '#FF6B81', css.mint, '#FFFFFF'], i;
+    spr.bg = mk(W + 2 * BG_M, H + 2 * BG_M);
+    paint(spr.bg, -BG_M, -BG_M, WINTER ? paintBgWinter : paintBgDefault);
+    spr.ox = G.cx - G.tw / 2 - pad; spr.oy = G.top - pad;
+    spr.back = mk(G.tw + 2 * pad, G.h + 2 * pad);
+    paint(spr.back, spr.ox, spr.oy, paintGlassBack);
+    spr.front = mk(G.tw + 2 * pad, G.h + 2 * pad);
+    paint(spr.front, spr.ox, spr.oy, paintGlassFront);
+    spr.glow = [];
+    for (i = 0; i < cols.length; i++) spr.glow.push(softDot(cols[i], 0.95));    // огни гирлянды
+    spr.puff = softDot('#FFFFFF', 0.8);                                         // пар и ближний снег
+    buildBodySprites();
+  }
+  function softDot(col, a) {                        // мягкое пятно: «размытие» без фильтров
+    var s = mk(48, 48);
+    paint(s, 0, 0, function () {
+      ctx.fillStyle = rGrad(24, 24, 0, 24, [0, rgba(col, a), 0.22, rgba(col, a * 0.45), 1, rgba(col, 0)]);
+      ctx.fillRect(0, 0, 48, 48);
+    });
+    return s;
+  }
+  function leaf(x, y, s, ang) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-s, 0); ctx.quadraticCurveTo(0, -s * 0.75, s, 0); ctx.quadraticCurveTo(0, s * 0.75, -s, 0);
+    ctx.fill(); ctx.restore();
+  }
+  // Обычный фон: мягкий градиент в фирменных цветах, едва заметный узор из шариков тапиоки и листьев чая
+  function paintBgDefault() {
+    var cell = 54, ix, iy, a, b, x, y;
+    ctx.fillStyle = vGrad(0, H, [0, css.soft, 0.55, css.soft2, 1, '#BCDDD9']);
+    ctx.fillRect(-BG_M, -BG_M, W + 2 * BG_M, H + 2 * BG_M);
+    ctx.fillStyle = rGrad(G.cx, G.top + G.h * 0.42, 0, G.h * 0.95, [0, rgba(css.card, 0.6), 1, rgba(css.card, 0)]);
+    ctx.fillRect(-BG_M, -BG_M, W + 2 * BG_M, H + 2 * BG_M);
+    for (iy = -1; iy <= Math.ceil(H / cell); iy++) {
+      for (ix = -1; ix <= Math.ceil(W / cell); ix++) {
+        a = hash2(ix, iy); b = hash2(ix + 31, iy - 17);
+        x = (ix + 0.2 + b * 0.6) * cell; y = (iy + 0.2 + hash2(ix - 9, iy + 44) * 0.6) * cell;
+        if (a < 0.36) { ctx.fillStyle = rgba(css.ink, 0.06); ctx.beginPath(); ctx.arc(x, y, 3 + b * 4.5, 0, PI2); ctx.fill(); }
+        else if (a < 0.56) { ctx.fillStyle = rgba(css.brand, 0.1); leaf(x, y, 7 + b * 6, a * 40); }
+      }
+    }
+  }
+  // Зимний фон: вечерний градиент, витрина точки WeDrink с тёплым светом (выше середины стакана,
+  // чтобы жидкость читалась на тёмной стене), провод гирлянды
+  function paintBgWinter() {
+    var ww = Math.min(W * 0.9, G.h * 1.5), wh = G.h * 0.42, wx = W / 2 - ww / 2, wy = Math.max(58, G.top - G.h * 0.16);
+    var sy = wy + wh * 0.64, cw = wh * 0.2, i, n, t, x, y;
+    ctx.fillStyle = vGrad(0, H, [0, css.night1, 0.55, css.night2, 1, css.night3]);
+    ctx.fillRect(-BG_M, -BG_M, W + 2 * BG_M, H + 2 * BG_M);
+    ctx.fillStyle = rGrad(W / 2, wy + wh * 0.6, ww * 0.15, ww * 0.95, [0, rgba(css.warm2, 0.4), 1, rgba(css.warm2, 0)]);   // свет из окна
+    ctx.fillRect(-BG_M, -BG_M, W + 2 * BG_M, H + 2 * BG_M);
+    ctx.fillStyle = '#0B3138'; roundRect(wx - 6, wy - 6, ww + 12, wh + 12, 14); ctx.fill();          // рама
+    ctx.fillStyle = vGrad(wy, wy + wh, [0, css.warm1, 0.6, css.warm2, 1, css.warm3]);
+    roundRect(wx, wy, ww, wh, 9); ctx.fill();                                                        // тёплое стекло
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = rGrad(W / 2, wy + wh * 0.3, 0, ww * 0.6, [0, 'rgba(255,255,255,0.5)', 1, 'rgba(255,255,255,0)']);
+    ctx.fillRect(wx, wy, ww, wh);
+    ctx.fillStyle = 'rgba(122,62,20,0.3)';                                                           // полка и силуэты стаканов за стеклом
+    ctx.fillRect(wx, sy, ww, 3);
+    for (i = 0; i < 7; i++) {
+      x = wx + ww * (0.08 + i * 0.14);
+      ctx.beginPath(); ctx.moveTo(x - cw / 2, sy - cw * 1.6); ctx.lineTo(x + cw / 2, sy - cw * 1.6);
+      ctx.lineTo(x + cw * 0.37, sy); ctx.lineTo(x - cw * 0.37, sy); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(16,64,94,0.14)'; ctx.fillRect(wx, wy, ww, wh);                             // стекло чуть в глубине
+    ctx.restore();
+    ctx.fillStyle = '#0B3138';                                                                       // переплёт
+    ctx.fillRect(wx + ww * 0.25 - 2, wy, 4, wh); ctx.fillRect(wx + ww * 0.75 - 2, wy, 4, wh);
+    ctx.fillStyle = css.brand; roundRect(W / 2 - 46, wy - 30, 92, 21, 10.5); ctx.fill();             // вывеска
+    ctx.font = '900 13px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF'; ctx.fillText('WeDrink', W / 2, wy - 19);
+    // гирлянда: провод и лампочки; свечение рисуется в кадре (мерцает)
+    ctx.strokeStyle = '#082329'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-BG_M, 2); ctx.quadraticCurveTo(W / 2, 30, W + BG_M, 2); ctx.stroke();
+    garland.length = 0;
+    n = W < 340 ? 7 : 9;
+    for (i = 0; i < n; i++) {
+      t = (i + 0.5) / n; x = t * W; y = 2 + 2 * t * (1 - t) * 28 + 5;
+      ctx.fillStyle = ['#FFD45C', '#FF6B81', '#8FE3DC', '#FFFFFF'][i % 4];
+      ctx.beginPath(); ctx.arc(x, y, 3.2, 0, PI2); ctx.fill();
+      garland.push({ x: x, y: y, c: i % 4, ph: hash2(i, 5) * PI2, sp: 1.6 + hash2(i, 9) * 2.2 });
+    }
+  }
+  // Задняя стенка стекла: лёгкая белизна и цилиндрическая тень
+  function paintGlassBack() {
+    var x0 = G.cx - G.tw / 2, x1 = G.cx + G.tw / 2;
+    glassPath(); ctx.closePath();
+    ctx.fillStyle = rgba(css.glass, WINTER ? 0.2 : 0.34); ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = lGrad(x0, 0, x1, 0, [0, 'rgba(255,255,255,0.5)', 0.14, 'rgba(255,255,255,0.1)', 0.6, 'rgba(255,255,255,0.02)', 0.86, 'rgba(255,255,255,0.1)', 1, 'rgba(255,255,255,0.4)']);
+    ctx.fillRect(x0, G.top, G.tw, G.h);
+    ctx.restore();
+  }
+  // Передняя стенка: преломление у стенок, блики, контур, зимой иней и вязаная манжета; надпись WeDrink
+  function paintGlassFront() {
+    var U = G.unit, x0 = G.cx - G.tw / 2, x1 = G.cx + G.tw / 2;
+    var wl = Math.sqrt(G.h * G.h + (G.tw - G.bw) * (G.tw - G.bw) / 4), nx = G.h / wl, ny = (G.tw - G.bw) / 2 / wl;
+    var w = G.tw * 0.14, edge = [0, rgba(css.ink, 0.26), 0.28, rgba(css.ink, 0.05), 0.5, 'rgba(255,255,255,0.2)', 1, 'rgba(255,255,255,0)'];
+    var cold = !game.hot, k, i, f, d, a, x, y, side, size;
+    ctx.save(); glassPath(); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = lGrad(x0, G.top, x0 + nx * w, G.top - ny * w, edge); ctx.fillRect(x0 - 4, G.top, G.tw / 2 + 4, G.h);      // жидкость у стенок темнее, рядом светлая полоса
+    ctx.fillStyle = lGrad(x1, G.top, x1 - nx * w, G.top - ny * w, edge); ctx.fillRect(G.cx, G.top, G.tw / 2 + 4, G.h);
+    ctx.fillStyle = vGrad(G.bottom - G.h * 0.1, G.bottom, [0, rgba(css.ink, 0), 1, rgba(css.ink, 0.18)]); ctx.fillRect(x0, G.bottom - G.h * 0.1, G.tw, G.h * 0.1);
+    ctx.fillStyle = vGrad(G.top, G.top + 9, [0, rgba(css.ink, 0.12), 1, rgba(css.ink, 0)]); ctx.fillRect(x0, G.top, G.tw, 9);
+    if (WINTER) {                                   // иней по краям стекла: у холодных напитков гуще
+      k = cold ? 1 : 0.5; w = G.tw * 0.22;
+      ctx.fillStyle = lGrad(x0, G.top, x0 + nx * w, G.top - ny * w, [0, 'rgba(255,255,255,' + 0.5 * k + ')', 1, 'rgba(255,255,255,0)']); ctx.fillRect(x0 - 4, G.top, G.tw / 2, G.h);
+      ctx.fillStyle = lGrad(x1, G.top, x1 - nx * w, G.top - ny * w, [0, 'rgba(255,255,255,' + 0.5 * k + ')', 1, 'rgba(255,255,255,0)']); ctx.fillRect(G.cx + 4, G.top, G.tw / 2, G.h);
+      ctx.fillStyle = '#FFFFFF';
+      for (i = 0; i < 170; i++) {                   // кристаллики
+        side = i % 2 ? 1 : -1; f = hash2(i, 3); d = hash2(i, 7); d = d * d * w + 2;
+        ctx.globalAlpha = (0.35 + hash2(i, 11) * 0.5) * k;
+        ctx.beginPath(); ctx.arc(G.cx + side * (halfW(f) - d), Y(f), (0.5 + hash2(i, 13) * 1.2) * U, 0, PI2); ctx.fill();
+      }
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = Math.max(1, 1.1 * U); ctx.lineCap = 'round';
+      for (i = 0; i < 8; i++) {
+        side = i % 2 ? 1 : -1; f = 0.3 + hash2(i, 21) * 0.65;
+        ctx.globalAlpha = 0.75 * k;
+        drawFlake(ctx, G.cx + side * (halfW(f) - (5 + hash2(i, 23) * 9) * U), Y(f), (2.4 + hash2(i, 27) * 2.6) * U, hash2(i, 29));
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineWidth = 5.5 * U;                        // длинный блик слева
+    ctx.strokeStyle = vGrad(Y(0.9), Y(0.16), [0, 'rgba(255,255,255,0.62)', 1, 'rgba(255,255,255,0.14)']);
+    ctx.beginPath(); ctx.moveTo(G.cx - halfW(0.9) + 9 * U, Y(0.9)); ctx.lineTo(G.cx - halfW(0.16) + 9 * U, Y(0.16)); ctx.stroke();
+    ctx.lineWidth = 3 * U; ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.moveTo(G.cx - halfW(0.93) + 17 * U, Y(0.93)); ctx.lineTo(G.cx - halfW(0.84) + 17 * U, Y(0.84)); ctx.stroke();
+    ctx.lineWidth = 2.5 * U; ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath(); ctx.moveTo(G.cx + halfW(0.86) - 8 * U, Y(0.86)); ctx.lineTo(G.cx + halfW(0.5) - 8 * U, Y(0.5)); ctx.stroke();
+    glassPath(); ctx.lineWidth = 5.5; ctx.strokeStyle = rgba(css.ink, WINTER ? 0.16 : 0.2); ctx.stroke();           // контур
+    glassPath(); ctx.lineWidth = 2.5; ctx.strokeStyle = rgba(css.glass, 0.95); ctx.stroke();
+    if (WINTER) { paintCuff(); return; }
+    size = Math.max(12, G.h * 0.085); y = Y(0.245); // надпись на стенке: бирюзовая с белой обводкой
+    ctx.font = '900 ' + size + 'px ' + FONT;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(2.5, size * 0.2); ctx.strokeStyle = rgba(css.glass, 0.92);
+    ctx.strokeText('WeDrink', G.cx, y);
+    ctx.fillStyle = css.brandDark; ctx.fillText('WeDrink', G.cx, y);
+  }
+  // Зима: вязаный «свитер»-манжета в фирменных цветах надет на низ стакана, надпись WeDrink вывязана на нём.
+  // Манжета ниже самой низкой черты (0,22), подход уровня к черте она не закрывает.
+  function paintCuff() {
+    var U = G.unit, f1 = 0.118, yt = Y(f1), wt = halfW(f1) + 3, ym = (yt + G.bottom) / 2 - U;
+    var x, y, row = 0, st = Math.max(3, 4.2 * U), size = Math.max(10, G.h * 0.066);
+    var wool = lGrad(G.cx - wt, 0, G.cx + wt, 0, [0, css.brandDark, 0.3, css.brand, 0.5, '#27A9A7', 0.72, css.brand, 1, css.brandDark]);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(G.cx - G.tw, yt, G.tw * 2, G.bottom - yt + 10); ctx.clip();          // только низ стакана
+    glassPath(); ctx.closePath();
+    ctx.fillStyle = wool; ctx.fill();
+    ctx.lineJoin = 'round'; ctx.lineWidth = 6; ctx.strokeStyle = wool; ctx.stroke();                // вязка толще стекла
+    ctx.clip();
+    ctx.lineWidth = Math.max(0.8, U); ctx.lineCap = 'round';
+    for (y = yt; y < G.bottom + st; y += st, row++) {                                               // петли вязки
+      for (x = G.cx - wt - st; x < G.cx + wt + st; x += st) {
+        ctx.strokeStyle = (row % 2) ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.1)';
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + st / 2, y + st * 0.7); ctx.lineTo(x + st, y); ctx.stroke();
+      }
+    }
+    ctx.fillStyle = css.accent;                                                                     // красные полоски
+    ctx.fillRect(G.cx - wt - 2, yt + 3.4 * U, 2 * wt + 4, 2.4 * U);
+    ctx.fillRect(G.cx - wt - 2, G.bottom - 6.4 * U, 2 * wt + 4, 2.4 * U);
+    ctx.restore();
+    ctx.font = '900 ' + size + 'px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillText('WeDrink', G.cx, ym + 1.5);
+    ctx.fillStyle = '#FFFFFF'; ctx.fillText('WeDrink', G.cx, ym + 0.5);
+    ctx.fillStyle = css.brandDark;                                                                  // валик сверху
+    roundRect(G.cx - wt - 1.5, yt - 2.4 * U, 2 * wt + 3, 4.8 * U, 2.4 * U); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(G.cx - wt + 4, yt - 1.6 * U, 2 * wt - 8, 1.2 * U);
+  }
+  // Заготовки тел: каждая рисуется один раз, в кадре — drawImage с поворотом
+  function buildBodySprites() {
+    var kinds = ['pearl', 'bean', 'jelly', 'ice', 'lemon', 'oreo'], i;
+    spr.body = {};
+    for (i = 0; i < kinds.length; i++) spr.body[kinds[i]] = bodySprite(kinds[i], Math.max(5, 0.05 * G.h));
+  }
+  function bodySprite(kind, R) {
+    var size = 2 * R + 4, s = mk(size, size);
+    s.R = R; s.size = size;
+    paint(s, -size / 2, -size / 2, function () {
+      var i, a, q;
+      if (kind === 'pearl') {                       // жемчужная тапиока: тёмный глянцевый шарик
+        ctx.fillStyle = rGrad(-R * 0.3, -R * 0.35, R * 0.08, R * 1.25, [0, css.pearlHi, 0.55, css.pearl, 1, '#1C100A']);
+        ctx.beginPath(); ctx.arc(0, 0, R, 0, PI2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ellipse(-R * 0.34, -R * 0.4, R * 0.2, R * 0.13);
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = R * 0.1;
+        ctx.beginPath(); ctx.arc(0, 0, R * 0.82, 0.3, 1.5); ctx.stroke();
+      } else if (kind === 'bean') {                 // красная фасоль
+        ctx.save(); ctx.scale(1, 0.76);
+        ctx.fillStyle = rGrad(-R * 0.3, -R * 0.4, R * 0.08, R * 1.25, [0, css.beanHi, 0.6, css.bean, 1, '#4E1512']);
+        ctx.beginPath(); ctx.arc(0, 0, R, 0, PI2); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(255,240,230,0.8)'; ctx.lineWidth = R * 0.13; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(R * 0.5, -R * 0.16); ctx.lineTo(R * 0.5, R * 0.16); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ellipse(-R * 0.3, -R * 0.32, R * 0.22, R * 0.11);
+      } else if (kind === 'jelly' || kind === 'ice') {   // кубик персикового желе; кубик льда
+        q = R * 0.84;
+        roundRect(-q, -q, 2 * q, 2 * q, q * 0.34);
+        ctx.fillStyle = kind === 'jelly'
+          ? lGrad(-q, -q, q, q, [0, rgba(css.jelly, 0.95), 1, rgba(css.jellyEdge, 0.92)])
+          : lGrad(-q, -q, q, q, [0, rgba(css.ice, 0.82), 1, rgba(css.iceEdge, 0.6)]);
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, R * 0.1);
+        ctx.strokeStyle = kind === 'jelly' ? rgba(css.jellyEdge, 0.9) : 'rgba(255,255,255,0.9)'; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; roundRect(-q * 0.66, -q * 0.66, q * 0.7, q * 0.3, q * 0.14); ctx.fill();
+        if (kind === 'ice') {
+          ctx.strokeStyle = rgba(css.iceEdge, 0.85); ctx.lineWidth = Math.max(1, R * 0.07);
+          ctx.beginPath(); ctx.moveTo(-q * 0.2, q * 0.6); ctx.lineTo(q * 0.55, q * 0.6); ctx.lineTo(q * 0.55, -q * 0.15); ctx.stroke();
+        }
+      } else if (kind === 'lemon') {                // долька лимона
+        ctx.fillStyle = css.lemonEdge; ctx.beginPath(); ctx.arc(0, 0, R, 0, PI2); ctx.fill();
+        ctx.fillStyle = '#FFF9D6'; ctx.beginPath(); ctx.arc(0, 0, R * 0.86, 0, PI2); ctx.fill();
+        ctx.fillStyle = css.lemon; ctx.beginPath(); ctx.arc(0, 0, R * 0.77, 0, PI2); ctx.fill();
+        ctx.strokeStyle = '#FFF9D6'; ctx.lineWidth = R * 0.09;
+        ctx.beginPath();
+        for (i = 0; i < 4; i++) { a = i * Math.PI / 4; ctx.moveTo(-Math.cos(a) * R * 0.77, -Math.sin(a) * R * 0.77); ctx.lineTo(Math.cos(a) * R * 0.77, Math.sin(a) * R * 0.77); }
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ellipse(-R * 0.3, -R * 0.36, R * 0.3, R * 0.16);
+      } else {                                      // Oreo: кусочек тёмного печенья с кремом
+        ctx.fillStyle = css.oreo; ctx.beginPath();
+        for (i = 0; i < 8; i++) {
+          a = i / 8 * PI2; q = R * (0.72 + hash2(i, 77) * 0.28);
+          if (i === 0) ctx.moveTo(Math.cos(a) * q, Math.sin(a) * q); else ctx.lineTo(Math.cos(a) * q, Math.sin(a) * q);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = css.oreoCream; ctx.lineWidth = R * 0.26; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-R * 0.42, R * 0.1); ctx.lineTo(R * 0.4, -R * 0.05); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.16)'; ellipse(-R * 0.2, -R * 0.4, R * 0.3, R * 0.14);
+      }
+    });
+    return s;
+  }
+  function drawBodies() {
+    var i, b, s, k;
+    for (i = 0; i < bodies.length; i++) {
+      b = bodies[i]; s = spr.body[b.kind];
+      if (!s) continue;
+      k = b.r / s.R;
+      ctx.save(); ctx.translate(b.x, b.y);
+      if (b.kind !== 'pearl') ctx.rotate(b.rot);    // у шарика блик не вращается
+      ctx.drawImage(s.c, -s.size / 2 * k, -s.size / 2 * k, s.size * k, s.size * k);
+      ctx.restore();
+    }
+  }
+  // Налитые слои: [{ ing, from, to }]. Твёрдый слой своей жидкости не даёт — поднимает ту, что под ним.
+  function segments(g) {
+    var segs = [], i, from, to, ing;
+    for (i = 0; i <= g.idx && i < SLOTS.length; i++) {
+      from = g.bounds[i];
+      if (from === undefined) break;
+      to = (i + 1 < g.bounds.length) ? g.bounds[i + 1] : g.level;
+      ing = g.ings[i];
+      if (ing.solid) { if (segs.length) segs[segs.length - 1].to = to; continue; }
+      if (to - from > 0.0005) segs.push({ ing: ing, from: from, to: to });
+    }
+    return segs;
+  }
+  // Поверхность верхнего слоя: пружинная волна, мениск у стенок, у сырной пенки — «шапка» с бугорками
+  function topY(x, yT, hpx, foamy) {
+    var U = G.unit, hw = halfW(game.level), u = clamp((x - G.cx) / hw, -1, 1);
+    var y = yT + surfOff(x) - 3 * U * Math.exp(-(1 - Math.abs(u)) * hw / (6 * U)), dome, bump;
+    if (foamy) {
+      dome = Math.min(7 * U, hpx * 0.35); bump = Math.min(2.6 * U, hpx * 0.2);
+      y -= dome * (0.333 - u * u) * 1.2 + bump * (Math.abs(Math.sin(u * 7 + 0.7)) - 0.64);
+    }
+    return y;
+  }
+  function segPath(s, top) {
+    var U = G.unit, x0 = G.cx - G.tw / 2 - 4, x1 = G.cx + G.tw / 2 + 4, yB = Y(s.from), yT = Y(s.to), x;
+    ctx.beginPath();
+    if (s.ing.foamy && s.from > 0.001) {            // пенка снизу чуть «затекает» в чай
+      ctx.moveTo(x0, yB);
+      for (x = x0; x <= x1 + 1; x += 5) ctx.lineTo(x, yB + (1 + Math.sin(x * 0.13 + 1) * Math.sin(x * 0.045)) * 2.4 * U);
+    } else {
+      ctx.moveTo(x0, yB + 0.5); ctx.lineTo(x1, yB + 0.5);
+    }
+    if (top) {
+      for (x = x1; x >= x0 - 1; x -= 4) ctx.lineTo(x, topY(x, yT, yB - yT, s.ing.foamy));
+    } else {
+      ctx.lineTo(x1, yT - 0.5); ctx.lineTo(x0, yT - 0.5);
+    }
+    ctx.closePath();
+  }
+  // veil = true — второй, полупрозрачный проход поверх тел и трубочки: они оказываются «в жидкости»
+  function drawLiquids(veil) {
+    var g = game, U = G.unit, segs = segments(g), x0 = G.cx - G.tw / 2 - 4, x1 = G.cx + G.tw / 2 + 4;
+    var k, s, yB, yT, hBlend, col, x, sy;
+    for (k = 0; k < segs.length; k++) {
+      s = segs[k]; yB = Y(s.from); yT = Y(s.to);
+      ctx.fillStyle = vGrad(yT, yB, [0, css[s.ing.pal + 'Top'], 1, css[s.ing.pal + 'Bot']]);
+      segPath(s, k === segs.length - 1);
+      ctx.fill();
+    }
+    if (veil || !segs.length) return;
+    for (k = 1; k < segs.length; k++) {             // мягкий переход: верхний слой чуть «затекает» в нижний
+      if (segs[k].ing.foamy) continue;
+      yT = Y(segs[k].from);
+      hBlend = Math.min(12 * U, (Y(segs[k - 1].from) - yT) * 0.5);
+      if (hBlend > 1) {
+        col = css[segs[k].ing.pal + 'Bot'];
+        ctx.fillStyle = vGrad(yT, yT + hBlend, [0, rgba(col, 0.9), 1, rgba(col, 0)]);
+        ctx.fillRect(x0, yT, x1 - x0, hBlend);
+      }
+    }
+    s = segs[segs.length - 1]; yB = Y(s.from); yT = Y(s.to);   // блик по поверхности
+    ctx.beginPath();
+    for (x = x0; x <= x1 + 1; x += 4) {
+      sy = topY(x, yT, yB - yT, s.ing.foamy) + 1;
+      if (x === x0) ctx.moveTo(x, sy); else ctx.lineTo(x, sy);
+    }
+    ctx.lineWidth = 2; ctx.strokeStyle = rgba(css.glass, s.ing.shine || 0.5); ctx.stroke();
+  }
+  function drawBubbles() {
+    var i, p;
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    for (i = 0; i < bubbles.length; i++) {
+      p = bubbles[i];
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, PI2); ctx.fill(); ctx.stroke();
+    }
+  }
+  function drawFoam() {                             // молочная пена: пузырьки лежат на поверхности и лопаются
+    var g = game, i, p, hw, x, yT = Y(g.level);
+    for (i = 0; i < foam.length; i++) {
+      p = foam[i]; hw = halfW(g.level) - p.r - 3; x = G.cx + p.u * hw;
+      ctx.globalAlpha = Math.min(1, p.life / 0.4) * 0.9;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath(); ctx.arc(x, yT + surfOff(x) - p.r * 0.2, p.r * Math.min(1, (p.max - p.life) * 6 + 0.3), 0, PI2); ctx.fill();
+      ctx.lineWidth = 0.8; ctx.strokeStyle = rgba(css.ink, 0.1); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Струя падает из-за верхнего края кадра; толщина дышит вместе со скоростью налива — это честная подсказка
+  function drawStream() {
+    var g = game, U = G.unit, slot = Math.min(g.idx, SLOTS.length - 1), ing = g.ings[slot];
+    if (ing.solid || g.pourAt < 0) return;
+    var sy = Y(g.level) + surfOff(G.cx) + 2, fall = 4200 * U;
+    var head = Math.min(sy, -12 + (g.time - g.pourAt) * fall);                                  // фронт струи летит вниз
+    var tail = g.state === 'pouring' ? -12 : Math.min(sy, -12 + (g.time - g.cutAt) * fall);      // хвост догоняет после отпускания
+    if (tail >= head - 1) return;
+    var w = Math.max(5, SLOTS[slot].stream * U) * (ing.thick ? 1.35 : 1) * (0.72 + 0.4 * wobbleAt(g.pourT, g.mods[slot]));
+    var ph = g.time * (ing.thick ? 7 : 16), amp = (ing.thick ? 0.6 : 1.2) * U, y;
+    var wAt = function (yy) {
+      return w * (1.12 - 0.3 * (yy + 12) / (sy + 12)) * (ing.thick ? 1 + 0.16 * Math.sin(yy * 0.05 - g.time * 9) : 1);
+    };
+    ctx.beginPath();
+    ctx.moveTo(G.cx - wAt(tail) / 2, tail);
+    for (y = tail + 12; y < head; y += 12) ctx.lineTo(G.cx - wAt(y) / 2 + Math.sin(y * 0.05 - ph) * amp, y);
+    ctx.lineTo(G.cx - wAt(head) / 2, head); ctx.lineTo(G.cx + wAt(head) / 2, head);
+    for (y = head - 12; y > tail; y -= 12) ctx.lineTo(G.cx + wAt(y) / 2 + Math.sin(y * 0.05 - ph + 1.3) * amp, y);
+    ctx.lineTo(G.cx + wAt(tail) / 2, tail); ctx.closePath();
+    ctx.fillStyle = lGrad(G.cx - w / 2, 0, G.cx + w / 2, 0, [0, css[ing.pal + 'Bot'], 0.35, css[ing.pal + 'Top'], 0.7, css[ing.pal + 'Top'], 1, css[ing.pal + 'Bot']]);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(G.cx - w * 0.28, tail, Math.max(1.5, w * 0.16), head - tail);
+    if (head >= sy - 1) { ctx.fillStyle = rgba(css[ing.pal + 'Top'], 0.9); ellipse(G.cx, sy, w * 1.1, 2.6 * U); }
+  }
+  // Бирюзовая плёнка-крышка. Пока льём, стакан открыт: видны только края плёнки на кромке.
+  // После третьего слоя плёнка «запаивается» слева направо (a: 0..1). Зимой на неё садятся снежинки и тают.
+  function drawFilm(a) {
+    var U = G.unit, h = Math.max(5, 7 * U), lip = Math.max(8, 10 * U), r = h / 2;
+    var xl = G.cx - G.tw / 2 - 5, xr = G.cx + G.tw / 2 + 5, y = G.top - h + 1.5, w, i, p, k;
+    ctx.fillStyle = css.brand;
+    roundRect(xl, y, lip, h, r); ctx.fill();
+    roundRect(xr - lip, y, lip, h, r); ctx.fill();
+    if (a <= 0) return;
+    w = lip + (xr - xl - lip) * a;
+    ctx.fillStyle = lGrad(xl, 0, xr, 0, [0, css.brandDark, 0.25, css.brand, 0.5, '#2BB3B0', 0.75, css.brand, 1, css.brandDark]);
+    roundRect(xl, y, w, h, r); ctx.fill();
+    if (w > 16) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(xl + 6, y + h * 0.2, w - 12, Math.max(1, h * 0.22)); }
+    if (a < 1) { ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(xl + w - 3, y - 1, 3, h + 2); }   // кромка запайки
+    ctx.fillStyle = '#FFFFFF';
+    for (i = 0; i < filmFlakes.length; i++) {
+      p = filmFlakes[i]; k = clamp((game.time - p.t) / 1.5, 0, 1);
+      ctx.globalAlpha = 1 - k;
+      ctx.beginPath(); ctx.arc(p.x, y + 1, p.r * (1 - k * 0.6), 0, PI2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Широкая красная трубочка: входит сквозь плёнку с пружинкой. topOnly — только часть над плёнкой.
+  function drawStraw(k, topOnly) {
+    var U = G.unit, w = Math.max(10, G.h * 0.075), L = G.h * 1.12;
+    ctx.save();
+    if (topOnly) { ctx.beginPath(); ctx.rect(G.cx - G.tw, -G.h, G.tw * 2, G.top - Math.max(5, 7 * U) + 1.5 + G.h); ctx.clip(); }
+    ctx.translate(G.cx + G.tw * 0.12, Y(0.1) - (1 - k) * G.h * 1.3); ctx.rotate(0.11);
+    ctx.fillStyle = lGrad(-w / 2, 0, w / 2, 0, [0, '#B8162E', 0.4, '#F4566C', 0.62, css.accent, 1, '#A51228']);
+    roundRect(-w / 2, -L, w, L, w * 0.22); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-w * 0.26, -L + 4, w * 0.14, L - 8);
+    ctx.fillStyle = '#8E0F22'; ellipse(0, -L + 2, w * 0.42, w * 0.13);
+    ctx.restore();
+  }
+  // ПРОЛИВ: жидкость идёт через кромку, потёки ползут по стенкам, под стаканом растёт лужа
+  function spillColor() { return css[liquidOf(game.ings, Math.min(game.idx, SLOTS.length - 1)).pal + 'Top']; }
+  function drawPuddle(since) {
+    var U = G.unit, col = spillColor(), k = clamp((since - 0.4) / 1.2, 0, 1), e = 1 - (1 - k) * (1 - k);
+    var rx = (G.bw / 2 + 18 * U) * (0.3 + 0.9 * e), ry = (2 + 7 * e) * U;
+    if (k <= 0) return;
+    ctx.fillStyle = rgba(css.ink, 0.14); ellipse(G.cx, G.bottom + 5 * U, rx + 2, ry + 1.5);
+    ctx.fillStyle = col;
+    ellipse(G.cx, G.bottom + 4 * U, rx, ry);
+    ellipse(G.cx - rx * 0.72, G.bottom + 5 * U, rx * 0.34, ry * 0.7);
+    ellipse(G.cx + rx * 0.8, G.bottom + 3.4 * U, rx * 0.26, ry * 0.6);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ellipse(G.cx - rx * 0.3, G.bottom + 3 * U, rx * 0.3, ry * 0.22);
+  }
+  function drawDrips(since) {
+    var U = G.unit, col = spillColor(), side, j, pass, delay, sp, head, tail, off, f, x, y, a;
+    a = clamp(1.4 - since * 1.2, 0, 1);            // вал жидкости на кромке, пока льётся через край
+    if (a > 0) { ctx.globalAlpha = a; ctx.fillStyle = col; ellipse(G.cx, G.top + 1, G.tw / 2 + 5, 5 * U); ctx.globalAlpha = 1; }
+    ctx.lineCap = 'round';
+    for (side = -1; side <= 1; side += 2) {
+      for (j = 0; j < 3; j++) {
+        delay = j * 0.14 + (side > 0 ? 0.06 : 0); sp = 0.9 - j * 0.22;
+        head = clamp((since - delay) * sp, 0, 1.02);
+        if (head <= 0) continue;
+        tail = clamp((since - delay - 0.55) * sp * 0.7, 0, head);
+        off = 3 + (j === 1 ? 0 : (j ? 3.5 : 1.8)) * U;
+        for (pass = 0; pass < 2; pass++) {
+          ctx.strokeStyle = pass ? col : rgba(css.ink, 0.14);
+          ctx.lineWidth = (5.4 - j * 1.1 + (pass ? 0 : 2.4)) * U;
+          ctx.beginPath();
+          ctx.moveTo(G.cx + side * (halfW(1 - tail) + off), Y(1 - tail));
+          ctx.lineTo(G.cx + side * (halfW(1 - head) + off), Math.min(G.bottom + 2 * U, Y(1 - head)));
+          ctx.stroke();
+        }
+        f = 1 - head; x = G.cx + side * (halfW(f) + off); y = Math.min(G.bottom + 2 * U, Y(f));
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, (3.6 - j * 0.6) * U, 0, PI2); ctx.fill();     // капля на конце потёка
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(x - U, y - U, 0.9 * U, 0, PI2); ctx.fill();
+      }
+    }
+  }
+  // ЧЕРТЫ: активная — красный бегущий пунктир с указателем, остальные — тонкие; подписи на светлых плашках
+  function drawTargets(t) {
+    var g = game, U = G.unit, i, f, y, hw, active, done, xl, xr, label, px, tw2, age, a, k;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    for (i = 0; i < SLOTS.length; i++) {
+      f = g.targets[i]; y = Y(f); hw = halfW(f);
+      done = g.scores[i] !== null;
+      active = i === g.idx && !done;
+      xl = G.cx - hw - 9; xr = G.cx + hw + 11;
+      ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(xl, y); ctx.lineTo(xr, y);
+      if (active) {
+        ctx.lineWidth = 4.6; ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.stroke();
+        dash([8, 5]); ctx.lineDashOffset = RM ? 0 : -t * 14;
+        ctx.lineWidth = 2.6; ctx.strokeStyle = css.accent; ctx.stroke();
+        dash([]); ctx.lineDashOffset = 0;
+      } else {
+        dash([3, 6]); ctx.lineWidth = 1.5;
+        ctx.strokeStyle = WINTER ? 'rgba(255,255,255,0.6)' : rgba(css.ink, done ? 0.3 : 0.45);
+        ctx.stroke(); dash([]);
+      }
+      label = g.ings[i].short + (done ? ' ' + g.scores[i] : '');
+      ctx.font = (active ? '800 13px ' : '700 11px ') + FONT;
+      tw2 = ctx.measureText(label).width;
+      px = xr + (active ? 12 + (RM ? 0 : Math.sin(t * 6) * 2) : 4);
+      ctx.fillStyle = active ? css.card : rgba(css.card, done ? 0.82 : 0.66);
+      roundRect(px, y - (active ? 10 : 8), tw2 + (active ? 14 : 10), active ? 20 : 16, active ? 10 : 8); ctx.fill();
+      if (active) {
+        ctx.fillStyle = css.accent;
+        ctx.beginPath(); ctx.moveTo(px - 9, y); ctx.lineTo(px - 1, y - 5); ctx.lineTo(px - 1, y + 5); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = active ? css.accent : (done && g.scores[i] === LAYER_MAX ? css.brandDark : css.muted);
+      ctx.fillText(label, px + (active ? 7 : 5), y + 0.5);
+    }
+    if (!g.flash) return;
+    age = g.time - g.flash.t;                       // «идеально»: кольцо-вспышка расходится от черты
+    if (age > 0.7) { g.flash = null; return; }
+    y = Y(g.flash.f); hw = halfW(g.flash.f);
+    for (k = 0; k < 2; k++) {
+      a = (age - k * 0.12) / 0.55;
+      if (a <= 0 || a >= 1) continue;
+      ctx.save(); ctx.translate(G.cx, y); ctx.scale(1, 0.24);
+      ctx.beginPath(); ctx.arc(0, 0, hw * (1 + a * 0.9), 0, PI2);
+      ctx.restore();
+      ctx.lineWidth = (7 * (1 - a) + 1) * U; ctx.strokeStyle = rgba(k ? '#FFFFFF' : css.sun, 0.9 * (1 - a)); ctx.stroke();
+    }
+    a = 1 - age / 0.7;
+    ctx.lineCap = 'round'; ctx.lineWidth = 3 + 9 * a; ctx.strokeStyle = rgba(css.sun, 0.8 * a);
+    ctx.beginPath(); ctx.moveTo(G.cx - hw - 12, y); ctx.lineTo(G.cx + hw + 12, y); ctx.stroke();
+  }
+  function drawParts() {
+    var i, p, a, r;
+    ctx.lineCap = 'round';
+    for (i = 0; i < parts.length; i++) {
+      p = parts[i]; a = clamp(p.life / p.max * 1.6, 0, 1);
+      ctx.globalAlpha = a;
+      if (p.k === 2) {                              // искра бенгальского огня: короткий яркий штрих
+        ctx.strokeStyle = p.c; ctx.lineWidth = p.r;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035); ctx.stroke();
+      } else if (p.k === 1) {                       // звёздочка
+        r = p.r * (0.7 + a * 0.6); ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y - r);
+        ctx.quadraticCurveTo(p.x, p.y, p.x + r, p.y); ctx.quadraticCurveTo(p.x, p.y, p.x, p.y + r);
+        ctx.quadraticCurveTo(p.x, p.y, p.x - r, p.y); ctx.quadraticCurveTo(p.x, p.y, p.x, p.y - r);
+        ctx.fill();
+      } else {                                      // капля или снежная пыль
+        ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, PI2); ctx.fill();
+        if (p.k === 0 && p.r > 2) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(p.x - p.r * 0.3, p.y - p.r * 0.3, p.r * 0.3, 0, PI2); ctx.fill(); }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function snowDrift() { return 1 - Math.exp(-game.time / 12); }   // сугроб копится за время попытки: 0..1
+  // Стол (обычный вид) или заснеженный подоконник (зима)
+  function drawTable() {
+    var U = G.unit, y0 = G.bottom - 7 * U, d, x;
+    if (!WINTER) {
+      ctx.fillStyle = vGrad(y0, H, [0, '#FFFDF6', 1, '#EFE4C8']); ctx.fillRect(-20, y0, W + 40, H - y0 + 20);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(-20, y0, W + 40, 2);
+      ctx.fillStyle = rgba(css.ink, 0.07); ctx.fillRect(-20, y0 - 1, W + 40, 1);
+      return;
+    }
+    d = snowDrift();
+    ctx.fillStyle = vGrad(y0 - 16 * U, H, [0, css.snow, 1, css.snowShade]);
+    ctx.beginPath(); ctx.moveTo(-20, H + 20); ctx.lineTo(-20, y0);
+    for (x = -20; x <= W + 28; x += 8) {            // по краям сугроб выше, под стаканом ровно
+      ctx.lineTo(x, y0 - (4 + 12 * d) * U * (0.5 + 0.5 * Math.sin(x * 0.021 + 1.2)) * (0.3 + 0.7 * Math.min(1, Math.abs(x - G.cx) / (G.tw * 0.9))));
+    }
+    ctx.lineTo(W + 20, H + 20); ctx.closePath(); ctx.fill();
+  }
+  function drawDriftFront() {
+    var U = G.unit, base = H - (5 + 20 * snowDrift()) * U, x;
+    ctx.fillStyle = vGrad(base - 10 * U, H, [0, '#FFFFFF', 1, '#DCEEF6']);
+    ctx.beginPath(); ctx.moveTo(-20, H + 20);
+    for (x = -20; x <= W + 28; x += 8) ctx.lineTo(x, base - 6 * U * Math.sin(x * 0.017 + 0.4) - 3 * U * Math.sin(x * 0.043 + 2));
+    ctx.lineTo(W + 20, H + 20); ctx.closePath(); ctx.fill();
+  }
+  function drawSnow(from, to) {                     // слои from..to: 0 — дальний, 2 — ближний (крупный, размытый)
+    var i, p, x, r;
+    ctx.fillStyle = '#FFFFFF';
+    for (i = 0; i < flakes.length; i++) {
+      p = flakes[i];
+      if (p.L < from || p.L > to) continue;
+      x = p.x + par.x * [4, 9, 18][p.L];
+      if (p.L === 2) {
+        r = p.r * 1.7; ctx.globalAlpha = 0.85;
+        ctx.drawImage(spr.puff.c, x - r, p.y - r, r * 2, r * 2);
+      } else {
+        ctx.globalAlpha = p.L ? 0.8 : 0.5;
+        ctx.beginPath(); ctx.arc(x, p.y, p.r, 0, PI2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawGarland(t) {                         // огни гирлянды: мягкое свечение, лёгкое мерцание; при удаче — ярче
+    var i, b, r;
+    for (i = 0; i < garland.length; i++) {
+      b = garland[i]; r = 20 + cup.glow * 12;
+      ctx.globalAlpha = Math.min(1, (RM ? 0.7 : 0.6 + 0.3 * Math.sin(t * b.sp + b.ph)) + cup.glow * 0.5);
+      ctx.drawImage(spr.glow[b.c].c, b.x - r, b.y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawSteam() {
+    var i, p, k, r;
+    for (i = 0; i < steam.length; i++) {
+      p = steam[i]; k = 1 - p.life / p.max; r = p.r * (1 + k * 1.4);
+      ctx.globalAlpha = Math.sin(Math.PI * k) * 0.62;
+      ctx.drawImage(spr.puff.c, p.x - r, p.y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function draw() {
+    var g = game;
+    if (!g || !G || !spr.bg) return;
+    var t = g.time, U = G.unit, since = (nowMs() - g.stateStart) / 1000, k, e, seal = 0, straw = 0;
+    var px = RM ? 0 : par.x * 6, py = RM ? 0 : par.y * 4;
+    ctx = mainCtx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);       // рисуем в CSS-пикселях, чёткость — через devicePixelRatio
+    ctx.globalAlpha = 1;
+    ctx.drawImage(spr.bg.c, -BG_M + px, -BG_M + py, spr.bg.w, spr.bg.h);   // фон с параллаксом
+    if (WINTER) {
+      ctx.save(); ctx.translate(px, py); drawGarland(t); ctx.restore();
+      drawSnow(0, 1);
+    }
+    ctx.save();
+    if (cup.shake > 0) ctx.translate(Math.sin(t * 61) * 5 * cup.shake * U, Math.cos(t * 47) * 3 * cup.shake * U);   // камера вздрагивает
+    drawTable();
+    k = 1 + cup.hop / (60 * U) * 0.25;            // в прыжке тень меньше
+    ctx.fillStyle = WINTER ? 'rgba(30,70,100,0.2)' : rgba(css.ink, 0.11);
+    ellipse(G.cx, G.bottom + 3 * U, G.bw * 0.68 * k, (7 * U + 2) * k);
+    ellipse(G.cx, G.bottom + 2 * U, G.bw * 0.5 * k, (4 * U + 1) * k);
+    if (g.state === 'spill') drawPuddle(since);
+    // стакан: прыжок и сжатие-растяжение вокруг дна
+    ctx.save();
+    ctx.translate(G.cx, G.bottom + cup.hop); ctx.scale(1 - cup.sq * 0.6, 1 + cup.sq); ctx.translate(-G.cx, -G.bottom);
+    ctx.drawImage(spr.back.c, spr.ox, spr.oy, spr.back.w, spr.back.h);
+    ctx.save(); glassPath(); ctx.closePath(); ctx.clip();
+    drawLiquids(false);
+    drawBubbles();
+    ctx.restore();
+    drawBodies();
+    if (g.seal !== null && !g.spilled) {
+      seal = clamp((t - g.seal) / 0.45, 0, 1);
+      seal = 1 - (1 - seal) * (1 - seal);         // плавное торможение
+      k = clamp((t - g.seal - 0.55) / 0.5, 0, 1);
+      if (k > 0) { e = k - 1; straw = 1 + 2.2 * e * e * e + 1.2 * e * e; drawStraw(straw, false); }   // трубочка входит с пружинкой
+    }
+    ctx.save(); glassPath(); ctx.closePath(); ctx.clip();
+    ctx.globalAlpha = 0.3; drawLiquids(true); ctx.globalAlpha = 1;       // тела и трубочка — «в жидкости»
+    drawFoam();
+    if (cup.fog > 0) {                            // зима: при ошибке стекло на миг запотевает
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.55 * cup.fog).toFixed(3) + ')';
+      ctx.fillRect(G.cx - G.tw / 2, G.top, G.tw, G.h);
+    }
+    ctx.restore();
+    drawStream();
+    ctx.drawImage(spr.front.c, spr.ox, spr.oy, spr.front.w, spr.front.h);
+    drawFilm(seal);
+    if (straw > 0) drawStraw(straw, true);
+    if (g.state === 'spill') drawDrips(since);
+    drawTargets(t);
+    ctx.restore();
+    drawSteam();
+    drawParts();
+    if (WINTER) { drawSnow(2, 2); drawDriftFront(); }
+    ctx.restore();
+  }
+
+  /* =====================================================================
+     ВВОД: pointer-события и пробел. Одно нажатие = один налив.
+     ===================================================================== */
+  var activePointer = null;
+  function onDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
+    if (activePointer !== null) return;           // второй палец не считается
+    activePointer = e.pointerId;
+    try { el.stage.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+    startPour();
+  }
+  function onUp(e) {
+    if (activePointer === null || e.pointerId !== activePointer) return;
+    activePointer = null;
+    stopPour();
+  }
+  // Параллакс: фон чуть сдвигается за пальцем или наклоном телефона (на очки не влияет)
+  function setParallax(x, y) {
+    par.tx = clamp(x, -1, 1); par.ty = clamp(y, -1, 1);
+    if (RM || WINTER) return;                     // зимой узор заменён гирляндой — она на месте
+    el.app.style.setProperty('--px', (par.tx * -8).toFixed(1) + 'px');
+    el.app.style.setProperty('--py', (par.ty * -6).toFixed(1) + 'px');
+  }
+  el.app.addEventListener('pointermove', function (e) {
+    var r = el.app.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) setParallax((e.clientX - r.left) / r.width * 2 - 1, (e.clientY - r.top) / r.height * 2 - 1);
+  });
+  window.addEventListener('deviceorientation', function (e) {
+    if (typeof e.gamma === 'number' && typeof e.beta === 'number') setParallax(e.gamma / 25, (e.beta - 45) / 30);
+  });
+  if (window.PointerEvent) {
+    el.stage.addEventListener('pointerdown', onDown);
+    el.stage.addEventListener('pointerup', onUp);
+    el.stage.addEventListener('pointercancel', onUp);
+    el.stage.addEventListener('lostpointercapture', onUp);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  } else {
+    // очень старые браузеры без Pointer Events
+    el.stage.addEventListener('touchstart', function (e) { if (e.cancelable) e.preventDefault(); startPour(); }, { passive: false });
+    el.stage.addEventListener('touchend', function () { stopPour(); });
+    el.stage.addEventListener('touchcancel', function () { stopPour(); });
+    el.stage.addEventListener('mousedown', function (e) { if (e.button === 0) startPour(); });
+    window.addEventListener('mouseup', function () { stopPour(); });
+  }
+  el.stage.addEventListener('touchmove', function (e) { if (e.cancelable) e.preventDefault(); }, { passive: false });
+
+  function isSpace(e) { return e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar' || e.keyCode === 32; }
+  window.addEventListener('keydown', function (e) {
+    if (!isSpace(e) || screen !== 'game') return;   // на остальных экранах пробел жмёт кнопку, как обычно
+    e.preventDefault();
+    if (!e.repeat) startPour();
+  });
+  window.addEventListener('keyup', function (e) {
+    if (!isSpace(e) || screen !== 'game') return;
+    e.preventDefault();
+    stopPour();
+  });
+  // свернули вкладку или ушёл фокус — это отпускание
+  window.addEventListener('blur', function () { activePointer = null; stopPour(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { activePointer = null; stopPour(); return; }
+    if (running) lastFrame = nowMs();
+    fxKick();
+    if (screen === 'start' || screen === 'limit') showStart();   // вернулись на другой день — новый напиток и попытки
+  });
+
+  // без контекстного меню, выделения и масштабирования жестом
+  el.app.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  el.app.addEventListener('selectstart', function (e) { e.preventDefault(); });
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+
+  el.play.addEventListener('click', startRound);
+  el.again.addEventListener('click', startRound);
+  el.home.addEventListener('click', showStart);    // попытки кончились — showStart сам покажет экран «На сегодня всё»
+
+  // ресайз и поворот экрана
+  function onResize() { layout(); if (fxSize()) fxKick(); }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', function () { setTimeout(onResize, 120); });
+  if (window.ResizeObserver) {
+    try { new ResizeObserver(layout).observe(el.stage); } catch (e) { /* хватит события resize */ }
+  }
+
+  /* =====================================================================
+     СТАРТ
+     ===================================================================== */
+  // Telegram Mini App: только безопасный вызов, если объект уже есть (скрипт Telegram здесь не подключается)
+  try {
+    if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+  } catch (e) { /* вне Telegram */ }
+
+  if (WINTER) el.app.classList.add('winter');     // зимний вид: тёмный фон, гирлянда, снег
+  readPalette();
+
+  // Скрытый сброс для проверки: ?reset=1 обнуляет счётчик попыток за сегодня (рекорды и профиль остаются)
+  var wasReset = false;
+  try {
+    if (/[?&]reset=1(?:&|$)/.test(String(window.location.search || ''))) {
+      var d0 = loadDay();
+      d0.used = 0;
+      saveDay(d0);
+      wasReset = true;
+    }
+  } catch (e) { /* адрес недоступен */ }
+
+  showStart();
+  if (wasReset) toast('Счётчик попыток сброшен');
+})();
+</script>
+</body>
+</html>

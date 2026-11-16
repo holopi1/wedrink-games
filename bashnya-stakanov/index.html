@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<!--
+  «Башня стаканов» — мини-игра WeDrink (Новосибирск), прототип. slug: bashnya-stakanov.
+  Один файл: HTML + CSS + JS, без внешних библиотек, шрифтов, картинок и запросов в сеть.
+  Стандарт: D:/Obsidian/_code/wedrink-game/SPEC.md (v2 + дополнение v3, 2026-11-16). Версия до v3 — index.pre-v3.html.
+  Палитра бренда — из SPEC (аудит бренда и исходники постеров; брендбука нет).
+  Напитки и топпинги — позиции меню WeDrink (wedrink-tools/cards/menu_data.py); цвета лежат в :root, canvas читает их оттуда же.
+  Проверка: ?reset=1 в адресе обнуляет счётчик попыток за сегодня.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#156F6E">
+<link rel="icon" href="data:,">
+<title>Башня стаканов — WeDrink</title>
+<style>
+:root{
+  /* фирменные цвета WeDrink (SPEC) */
+  --brand:#1B8F8E; --brand-dark:#156F6E; --accent:#DC223C; --bg:#FBF7EC; --ink:#1F2A2A;
+  /* служебные оттенки интерфейса и уголка точки */
+  --card:#FFFDF6; --muted:#4D5C5C; --soft:#DDEDEA; --soft-2:#CFE9E6; --line:#E8DFC4; --sun:#FFD45C; --sun-deep:#F2B01E;
+  --brand-light:#43B9B5; --wood:#EAD4A9; --wood-dark:#C9A772; --lamp:#FFE9A8;
+  /* напитки меню: молочный чай, чёрный чай, жасминовый чай с джемом, кокосовое молоко */
+  --milk-tea-top:#F0DCC0; --milk-tea-bot:#C99668; --dbl-bot:#A9703F;
+  --tea-top:#DB9850; --tea-bot:#8E4A20;
+  --grape-top:#E3CDEB; --grape-bot:#7B479C;
+  --strawberry-top:#F9BAC5; --strawberry-bot:#E5627C;
+  --peach-top:#FBD3A4; --peach-bot:#F09A52;
+  --oreo-top:#E5D8C8; --oreo-bot:#BBA084;
+  --choco-top:#BC8F6A; --choco-bot:#55301D; --coconut-milk:#FFF6E9;
+  --strawcoco-top:#FCDDE2; --strawcoco-bot:#EE9CB0;
+  /* топпинги: жемчужная тапиока, красная фасоль, кокосовое желе, персиковое желе, Oreo, сырная пенка, лимон */
+  --tapioca:#3B2519; --tapioca-hi:#8A6044; --red-bean:#7E2F33; --red-bean-hi:#B5565A;
+  --coconut-jelly:#FFFDF2; --peach-jelly:#FFB870; --oreo:#2B2626;
+  --cheese-foam:#FFF3CC; --foam-shade:#EBCF86; --lemon:#F9E06A; --lemon-rind:#F2C230;
+  /* текст прямо на фоне приложения: зимой фон тёмный, текст светлый */
+  --on-bg:#1F2A2A; --on-bg-muted:#4D5C5C; --on-bg-brand:#156F6E; --on-bg-accent:#DC223C; --wordmark:#1B8F8E;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{
+  font-family:var(--font);color:var(--ink);
+  background:radial-gradient(120% 90% at 50% 0%,#1F9C9A 0%,var(--brand-dark) 55%,#0F5756 100%);
+  overflow:hidden;overscroll-behavior:none;touch-action:manipulation;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
+}
+#app{
+  position:fixed;top:0;right:0;bottom:0;left:0;margin:auto;
+  width:100%;max-width:460px;height:100%;max-height:920px;
+  /* фон не плоский: мягкий градиент и едва заметные шарики тапиоки */
+  background:
+    radial-gradient(circle at 11px 13px,rgba(27,143,142,.075) 3.2px,transparent 3.8px) 0 0/46px 46px,
+    radial-gradient(circle at 34px 36px,rgba(27,143,142,.05) 2.2px,transparent 2.8px) 0 0/46px 46px,
+    radial-gradient(90% 46% at 50% 0%,rgba(67,185,181,.20),transparent 70%),
+    linear-gradient(180deg,#FFFCF2 0%,var(--bg) 46%,#F3ECD6 100%);
+  display:flex;flex-direction:column;overflow:hidden;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+}
+@media (min-width:520px) and (min-height:640px){
+  #app{height:calc(100% - 40px);border-radius:28px;box-shadow:0 24px 70px rgba(0,0,0,.34)}
+}
+
+/* шапка бренда — на каждом экране */
+.brandbar{flex:none;text-align:center;padding:14px 16px 8px}
+.wordmark{font-weight:900;font-size:44px;line-height:1;letter-spacing:-.035em;color:var(--wordmark);text-shadow:0 2px 0 rgba(255,255,255,.9)}
+.wordmark .flake{display:none;width:.42em;height:.42em;margin-left:.08em;vertical-align:.5em;stroke:#fff;stroke-width:2.4;stroke-linecap:round;fill:none}
+.city{font-size:12px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--on-bg-brand);margin-top:4px}
+.hud{display:none;gap:6px}
+#app.is-game .brandbar{display:flex;align-items:center;justify-content:space-between;text-align:left;padding:8px 12px 8px}
+#app.is-game .wordmark{font-size:28px}
+#app.is-game .city{font-size:9px;margin-top:2px}
+#app.is-game .hud{display:flex}
+.chip{min-width:74px;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:5px 10px 6px;text-align:center}
+.chip i{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--muted)}
+.chip b{display:block;font-size:21px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.chip.total{background:linear-gradient(180deg,var(--brand),var(--brand-dark));border-color:var(--brand-dark);box-shadow:0 4px 12px rgba(21,111,110,.28)}
+.chip.total i{color:rgba(255,255,255,.8)}
+.chip.total b{color:#fff}
+.chip.bump{animation:bump .34s cubic-bezier(.2,1.6,.4,1)}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+
+/* экраны: плавное появление и уход */
+.screens{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.screen{display:none;flex:1;min-height:0;flex-direction:column}
+.screen.is-on{display:flex;animation:scr-in .4s cubic-bezier(.2,.9,.3,1) both}
+.screen.is-leaving{display:flex;position:absolute;top:0;right:0;bottom:0;left:0;z-index:3;pointer-events:none;animation:scr-out .22s ease-in both}
+.screen.scroll{overflow-y:auto;touch-action:pan-y;scrollbar-width:none}
+.screen.scroll::-webkit-scrollbar{display:none}
+@keyframes scr-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes scr-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-12px)}}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+
+.btn{
+  position:relative;overflow:hidden;
+  -webkit-appearance:none;appearance:none;border:0;border-radius:999px;cursor:pointer;flex:none;
+  background:linear-gradient(180deg,#F0445B,var(--accent));color:#fff;font:900 20px/1 var(--font);letter-spacing:.01em;
+  padding:18px 30px;min-width:220px;box-shadow:0 6px 0 #A8152B,0 16px 26px rgba(220,34,60,.28);
+  touch-action:manipulation;transition:transform .08s,box-shadow .08s,opacity .2s;
+}
+.btn::after{
+  content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);animation:sheen 3.4s ease-in-out infinite;
+}
+@keyframes sheen{0%,55%{left:-70%}100%{left:130%}}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #A8152B,0 6px 12px rgba(220,34,60,.24)}
+.btn:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
+.btn[disabled]{opacity:.55}
+
+/* старт */
+#s-start{align-items:center;text-align:center;padding:0 18px 14px;gap:9px}
+#s-start > *{flex:none}
+#s-start.is-on > *{animation:rise .5s cubic-bezier(.2,.9,.3,1) both}
+#s-start.is-on > :nth-child(2){animation-delay:.05s}
+#s-start.is-on > :nth-child(3){animation-delay:.1s}
+#s-start.is-on > :nth-child(4){animation-delay:.15s}
+#s-start.is-on > :nth-child(5){animation-delay:.2s}
+#s-start.is-on > :nth-child(n+6){animation-delay:.25s}
+.tagline{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--on-bg-accent);white-space:nowrap}
+.tagline::before,.tagline::after{content:"";width:16px;height:2px;border-radius:2px;background:currentColor;opacity:.55}
+.intro{display:flex;align-items:center;gap:12px;width:100%;max-width:380px;text-align:left;margin-top:auto}
+.hero{
+  position:relative;flex:0 0 118px;height:196px;border-radius:26px;overflow:hidden;
+  background:radial-gradient(90% 60% at 50% 30%,#fff 0%,var(--soft) 60%,var(--soft-2) 100%);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.8),0 10px 24px rgba(21,111,110,.18);
+}
+.hero canvas,.res-tower canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+.intro-text{flex:1;min-width:0}
+.title{font-size:32px;line-height:1;font-weight:900;letter-spacing:-.025em;color:var(--on-bg)}
+.dayline{margin-top:10px;font-size:15px;line-height:1.3;font-weight:700;color:var(--on-bg)}
+.dayline .lbl{display:block;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--on-bg-brand)}
+.dayline .nm{display:block;font-size:17px;font-weight:900;line-height:1.15;margin:2px 0 3px}
+.dayline .stars{white-space:nowrap;color:var(--on-bg-accent);letter-spacing:.05em}
+.profile{width:100%;max-width:380px;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:10px 12px 10px;box-shadow:0 6px 16px rgba(31,42,42,.05)}
+.profile-row{display:flex;justify-content:space-between;gap:8px;font-size:14px;font-weight:700;color:var(--muted)}
+.profile-row b{color:var(--ink);font-weight:900}
+.dots{display:flex;justify-content:space-between;margin-top:8px}
+.cd{width:34px;text-align:center;font-size:10px;font-weight:700;color:var(--muted)}
+.cd .ring{
+  display:flex;align-items:center;justify-content:center;
+  width:30px;height:30px;margin:0 auto 2px;border-radius:50%;border:2px solid var(--line);background:var(--bg);
+}
+.cd .cup{display:block;width:11px;height:16px;background:var(--line);-webkit-clip-path:polygon(0 0,100% 0,84% 100%,16% 100%);clip-path:polygon(0 0,100% 0,84% 100%,16% 100%)}
+.cd.on .ring{background:linear-gradient(180deg,var(--brand-light),var(--brand));border-color:var(--brand)}
+.cd.on .cup{background:#fff}
+.cd.today .ring{box-shadow:0 0 0 2px var(--accent)}
+.cd.today{color:var(--accent)}
+.rule{font-size:15px;line-height:1.35;color:var(--on-bg-muted);max-width:340px}
+.meta{font-size:14px;line-height:1.4;color:var(--on-bg-muted);min-height:20px}
+.meta b{color:var(--on-bg)}
+.proto{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--on-bg-brand);opacity:.8;margin-bottom:auto}
+@media (max-width:340px){.title{font-size:27px}.hero{flex-basis:100px;height:166px}.dayline .nm{font-size:15px}#s-start{gap:8px}}
+@media (max-height:560px){.hero{height:132px}.btn{padding:15px 26px}.wordmark{font-size:34px}}
+
+/* игра */
+.stage{
+  position:relative;flex:1;min-height:0;margin:0 12px;border-radius:22px;overflow:hidden;
+  background:linear-gradient(180deg,#F8F4E3,var(--soft) 50%,var(--soft-2));touch-action:none;cursor:pointer;
+  box-shadow:0 10px 26px rgba(21,111,110,.16);
+}
+.stage::after{
+  content:"";position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;border-radius:22px;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),inset 0 26px 36px -26px rgba(255,255,255,.7),inset 0 -30px 40px -30px rgba(15,87,86,.3);
+}
+#cv{position:absolute;top:0;left:0;width:100%;height:100%;display:block;touch-action:none}
+.pop{
+  position:absolute;left:50%;top:8px;z-index:2;pointer-events:none;text-align:center;white-space:nowrap;
+  background:var(--card);border-radius:16px;padding:6px 16px 7px;box-shadow:0 8px 20px rgba(31,42,42,.18);
+  opacity:0;transform:translate(-50%,-8px) scale(.9);transition:opacity .16s,transform .16s;
+}
+.pop b{display:block;font-size:20px;font-weight:900;line-height:1.1}
+.pop span{display:block;font-size:14px;font-weight:800;color:var(--brand-dark);font-variant-numeric:tabular-nums}
+.pop.on{opacity:1;animation:pop .34s cubic-bezier(.2,1.6,.4,1) both}
+.pop.perfect{background:linear-gradient(180deg,#FFE48E,var(--sun))}
+.pop.perfect span{color:var(--ink)}
+.pop.fall b,.pop.fall span{color:var(--accent)}
+@keyframes pop{from{transform:translate(-50%,-8px) scale(.55)}to{transform:translate(-50%,0) scale(1)}}
+.hint{flex:none;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 12px;text-align:center}
+.hint b{max-width:100%;font-size:14px;font-weight:900;color:var(--on-bg-brand);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hint span{font-size:11px;font-weight:700;color:var(--on-bg-muted);margin-top:1px}
+
+/* результат и лимит */
+#s-result,#s-limit{align-items:center;text-align:center;padding:2px 18px 14px;gap:10px}
+@media (max-height:600px){#s-result{gap:7px;padding-bottom:10px}.score b{font-size:54px}}
+#s-result > *,#s-limit > *{flex:none}
+.res-title{font-size:24px;line-height:1.12;font-weight:900;letter-spacing:-.01em;max-width:340px;margin-top:auto;color:var(--on-bg)}
+.win .res-title{color:var(--on-bg-brand);font-size:30px}
+.score{display:flex;align-items:baseline;justify-content:center;gap:8px}
+.score b{font-size:60px;line-height:1;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--on-bg)}
+.win .score b{color:var(--on-bg-accent)}
+.score span{font-size:17px;font-weight:700;color:var(--on-bg-muted)}
+.res-body{display:flex;gap:10px;width:100%;max-width:380px;align-items:stretch}
+.res-tower{
+  position:relative;flex:0 0 46%;height:216px;height:clamp(216px,38vh,340px);border-radius:20px;overflow:hidden;cursor:pointer;
+  background:linear-gradient(180deg,#F8F4E3,var(--soft) 55%,var(--soft-2));
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.8),0 8px 20px rgba(21,111,110,.14);
+}
+.res-stats{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;justify-content:center}
+.stat{
+  display:flex;justify-content:space-between;align-items:baseline;gap:6px;text-align:left;
+  background:var(--card);border:2px solid var(--line);border-radius:14px;padding:6px 10px;
+  font-size:13px;font-weight:700;color:var(--muted);
+}
+.stat b{font-size:18px;font-weight:900;color:var(--ink);font-variant-numeric:tabular-nums}
+.stat.gold{border-color:var(--sun);background:linear-gradient(180deg,#FFF6D6,var(--card))}
+.stat.wide{display:block;font-size:12px;line-height:1.3}
+.stat.wide b{display:block;font-size:13px;line-height:1.25}
+/* призовой талон: без цен, сумм и условий — только то, что решил руководитель */
+.ticket{
+  position:relative;width:100%;max-width:380px;border-radius:22px;padding:22px 14px 12px;margin-top:8px;
+  background:linear-gradient(180deg,#FFFFFF,var(--card));border:3px dashed var(--brand);
+  box-shadow:0 12px 28px rgba(21,111,110,.18);
+}
+.win.is-on .ticket{animation:ticket .6s cubic-bezier(.2,1.5,.4,1) .25s both}
+@keyframes ticket{from{opacity:0;transform:scale(.8) rotate(-2deg)}to{opacity:1;transform:none}}
+.ticket-tag{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--brand-dark);color:#fff;
+  font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:4px 12px;border-radius:999px;
+}
+.ticket-main{font-size:22px;line-height:1.15;font-weight:900;color:var(--brand-dark)}
+.ticket-how{font-size:14px;line-height:1.3;font-weight:700;color:var(--ink);margin-top:8px}
+.ticket-word{
+  display:inline-block;margin-top:8px;padding:9px 20px 10px;border-radius:16px;
+  background:linear-gradient(180deg,#F0445B,var(--accent));color:#fff;
+  font-size:30px;line-height:1;font-weight:900;letter-spacing:.04em;box-shadow:0 5px 0 #A8152B;
+}
+.ticket-rule{font-size:13px;line-height:1.3;font-weight:700;color:var(--muted);margin-top:12px}
+.ticket-stamp{margin-top:8px;padding-top:8px;border-top:2px dashed var(--line);font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--brand-dark)}
+/* на призовом экране талон для кассы стоит сразу под счётом */
+.win .res-title{order:-3}
+.win .score{order:-2}
+.win .ticket{order:-1}
+.note{font-size:14px;line-height:1.35;color:var(--on-bg-muted);max-width:330px}
+.note:empty{display:none}
+.tail{flex:none;height:0;margin-bottom:auto}
+.limit-title{font-size:28px;line-height:1.15;font-weight:900;max-width:320px;margin-top:auto;color:var(--on-bg)}
+.limit-record{font-size:18px;font-weight:800;color:var(--on-bg-brand)}
+.limit-record:empty{display:none}
+
+.toast{
+  position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5;pointer-events:none;
+  background:var(--ink);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:999px;
+  opacity:0;transition:opacity .25s;white-space:nowrap;
+}
+.toast.on{opacity:.92}
+
+/* салют на призовом экране: отдельный слой поверх всего, касания не ловит */
+#fx{position:absolute;top:0;left:0;width:100%;height:100%;z-index:6;pointer-events:none;display:block}
+
+/* ===== Зима (SPEC v4): включается классом .winter на #app при SEASON === 'winter' ===== */
+.garland,.ribbon{display:none}
+#app.winter{
+  --on-bg:#FFFFFF; --on-bg-muted:rgba(255,255,255,.84); --on-bg-brand:#A5EEE9; --on-bg-accent:#FFD45C; --wordmark:#FFFFFF;
+  /* глубокий вечер: тёмная бирюза — синий, тёплый свет окна и редкий снег */
+  background:
+    radial-gradient(circle at 18% 16%,rgba(255,212,92,.20),transparent 24%),
+    radial-gradient(circle at 86% 26%,rgba(67,185,181,.24),transparent 26%),
+    radial-gradient(circle at 74% 90%,rgba(220,34,60,.14),transparent 28%),
+    radial-gradient(circle at 11px 13px,rgba(255,255,255,.10) 1.6px,transparent 2.2px) 0 0/46px 46px,
+    radial-gradient(circle at 34px 36px,rgba(255,255,255,.06) 1.1px,transparent 1.7px) 0 0/46px 46px,
+    linear-gradient(180deg,#0E5F63 0%,#0F4763 46%,#102B52 100%);
+}
+#app.winter .wordmark{text-shadow:0 0 18px rgba(67,185,181,.75),0 2px 0 rgba(8,40,60,.5)}
+#app.winter .wordmark .flake{display:inline-block}
+#app.winter .brandbar{padding-top:22px}
+#app.winter.is-game .brandbar{padding-top:18px}
+#app.winter .garland{display:block;position:absolute;top:0;left:0;right:0;height:30px;z-index:1;pointer-events:none;transition:filter .5s}
+.garland::before,.garland::after{
+  content:"";position:absolute;top:0;left:0;right:0;height:30px;
+  background:
+    radial-gradient(circle at 12px 8px,#FFE28A 2.4px,rgba(255,212,92,.5) 3.4px,transparent 9px) 0 0/96px 30px repeat-x,
+    radial-gradient(circle at 36px 13px,#FF8496 2.4px,rgba(220,34,60,.5) 3.4px,transparent 9px) 0 0/96px 30px repeat-x,
+    radial-gradient(circle at 60px 8px,#8CEDE8 2.4px,rgba(67,185,181,.5) 3.4px,transparent 9px) 0 0/96px 30px repeat-x,
+    radial-gradient(circle at 84px 13px,#FFFFFF 2.2px,rgba(255,255,255,.45) 3.2px,transparent 9px) 0 0/96px 30px repeat-x;
+}
+.garland::after{background-position:48px 2px,48px 2px,48px 2px,48px 2px;animation:twinkle 2.2s ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.25}to{opacity:1}}
+#app.winter.prize .garland{filter:brightness(1.5) saturate(1.3) drop-shadow(0 0 6px rgba(255,226,138,.9))}
+#app.winter.prize .garland::after{animation-duration:.6s}
+#app.winter .hero{
+  background:radial-gradient(120% 60% at 50% 78%,rgba(255,233,168,.9) 0%,rgba(255,226,150,.4) 48%,transparent 82%),linear-gradient(180deg,#0F3558,#135A70);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.28),0 10px 26px rgba(0,0,0,.3);
+}
+#app.winter .stage{background:linear-gradient(180deg,#0C2447,#0F4A5E 60%,#0F5158);box-shadow:0 10px 28px rgba(0,0,0,.34)}
+#app.winter .stage::after{box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),inset 0 -30px 40px -30px rgba(4,20,40,.6)}
+#app.winter .res-tower{background:linear-gradient(180deg,#0C2447,#0F4A5E 62%,#12606A);box-shadow:inset 0 0 0 2px rgba(255,255,255,.26),0 8px 22px rgba(0,0,0,.3)}
+#app.winter .profile,#app.winter .stat,#app.winter .chip{box-shadow:0 8px 20px rgba(0,0,0,.22)}
+/* зимний талон — новогодняя открытка: тёплый свет и ленточка */
+#app.winter .ticket{
+  border:3px solid var(--sun-deep);
+  background:radial-gradient(120% 80% at 50% 0%,#FFF3C4 0%,#FFFDF6 52%,#FFEFC9 100%);
+  box-shadow:0 0 44px rgba(255,212,92,.5),0 14px 30px rgba(0,0,0,.34);
+}
+#app.winter .ribbon{
+  display:block;position:absolute;top:-3px;right:9px;width:16px;height:46px;
+  background:linear-gradient(90deg,#B3142E,var(--accent) 45%,#F0566B);
+  -webkit-clip-path:polygon(0 0,100% 0,100% 100%,50% 80%,0 100%);clip-path:polygon(0 0,100% 0,100% 100%,50% 80%,0 100%);
+}
+
+/* меньше движения — по настройке системы */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-delay:0s !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .btn::after{display:none}
+  .garland::after{opacity:.7}
+}
+
+/* ===== Маскот (v5): один data-URI (assets/mascot-256.webp) в переменной #app, используется на старте и у билета ===== */
+#app{--wd-img:url("data:image/webp;base64,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")}
+.wd-mascot{display:block;flex:none;width:clamp(72px,18vh,136px);height:clamp(72px,18vh,136px);
+  background:var(--wd-img) center/contain no-repeat;transform-origin:50% 92%;
+  animation:wd-sway 3.6s ease-in-out infinite;filter:drop-shadow(0 6px 8px rgba(31,42,42,.18));
+  pointer-events:none;-webkit-user-select:none;user-select:none}
+/* у билета маскот выглядывает над его правым верхним краем и не занимает места в потоке (кнопки не уезжают) */
+.wd-prize-m{display:none;position:relative;height:0;width:100%;flex:none;pointer-events:none;z-index:2}
+.wd-prize-m::before{content:"";position:absolute;right:0;bottom:-12px;width:clamp(68px,10vh,88px);height:clamp(68px,10vh,88px);
+  background:var(--wd-img) center/contain no-repeat;transform-origin:50% 92%;animation:wd-sway 3.6s ease-in-out infinite;
+  filter:drop-shadow(0 4px 6px rgba(31,42,42,.22))}
+.screen:has(.ticket:not([hidden])) .wd-prize-m{display:block}
+@keyframes wd-sway{0%,100%{transform:rotate(-2.5deg) translateY(0)}50%{transform:rotate(2.5deg) translateY(-3px)}}
+#app.winter .wd-mascot,#app[data-season="winter"] .wd-mascot{
+  background:var(--wd-img) center/contain no-repeat,radial-gradient(closest-side,rgba(255,244,214,.62),rgba(255,244,214,.22) 62%,rgba(255,244,214,0) 100%);
+  filter:drop-shadow(0 0 5px rgba(255,255,255,.55)) drop-shadow(0 4px 8px rgba(0,0,0,.3))}
+#app.winter .wd-prize-m::before,#app[data-season="winter"] .wd-prize-m::before{
+  background:var(--wd-img) center/contain no-repeat,radial-gradient(closest-side,rgba(255,244,214,.62),rgba(255,244,214,.22) 62%,rgba(255,244,214,0) 100%);
+  filter:drop-shadow(0 0 5px rgba(255,255,255,.55)) drop-shadow(0 4px 8px rgba(0,0,0,.3))}
+@media (max-height:640px){.wd-mascot{width:72px;height:72px}}
+@media (prefers-reduced-motion:reduce){.wd-mascot,.wd-prize-m::before{animation:none}}
+.intro{position:relative} .intro > .wd-mascot{position:absolute;left:-8px;bottom:-12px;z-index:2;width:clamp(72px,12vh,88px);height:clamp(72px,12vh,88px)}
+/* ===== Ссылка в зал игр (v5): одна на приложение, видна на стартовом экране и на экране результата ===== */
+.wd-back{display:none;position:absolute;left:6px;top:6px;z-index:30;padding:9px 10px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color:var(--brand-dark,#156F6E);text-decoration:none;border-radius:999px;-webkit-tap-highlight-color:transparent}
+#app:has(#s-start.is-on) .wd-back,#app:has(#s-result.is-on) .wd-back{display:block}
+.wd-back:hover,.wd-back:focus-visible{text-decoration:underline}
+#app.winter .wd-back,#app[data-season="winter"] .wd-back{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}
+</style>
+</head>
+<body>
+<div id="app">
+  <a class="wd-back" href="../index.html">← Все игры</a>
+  <div class="garland" aria-hidden="true"></div>
+
+  <!-- Шапка бренда: видна на каждом экране; в игре сжимается и показывает счётчики -->
+  <header class="brandbar">
+    <div class="brandmark">
+      <div class="wordmark">WeDrink<svg class="flake" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M12 5.5l-2.4-2M12 5.5l2.4-2M12 18.5l-2.4 2M12 18.5l2.4 2"/></svg></div>
+      <div class="city">Новосибирск</div>
+    </div>
+    <div class="hud">
+      <div class="chip"><i>Стакан</i><b id="hud-n">1/10</b></div>
+      <div class="chip total" id="chip-score"><i>Счёт</i><b id="hud-score">0</b></div>
+    </div>
+  </header>
+
+  <main class="screens">
+
+  <!-- Экран 1: старт -->
+  <section class="screen scroll is-on" id="s-start">
+    <p class="tagline">Настоящий азиатский чай</p>
+    <div class="intro">
+      <!-- MASCOT_SLOT -->
+      <div class="hero"><canvas id="hero" aria-hidden="true"></canvas></div>
+      <div class="wd-mascot"></div>
+      <div class="intro-text">
+        <h1 class="title">Башня стаканов</h1>
+        <p class="dayline" id="dayline"></p>
+      </div>
+    </div>
+    <div class="profile">
+      <div class="profile-row"><span>Серия: <b id="streak"></b></span><span>Коллекция: <b id="coll"></b></span></div>
+      <div class="dots" id="dots"></div>
+    </div>
+    <p class="rule">Тапни, когда стакан над башней. Чем ровнее, тем больше очков.</p>
+    <button class="btn" id="btn-play" type="button">Играть</button>
+    <div class="meta" id="start-meta"></div>
+    <div class="proto" id="proto">прототип</div>
+  </section>
+
+  <!-- Экран 2: игра -->
+  <section class="screen" id="s-game">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="pop" id="pop" aria-live="polite"><b id="pop-big"></b><span id="pop-small"></span></div>
+    </div>
+    <div class="hint"><b id="hint-name">Башня стаканов</b><span id="hint-sub">Тап, клик или пробел: стакан опускается</span></div>
+  </section>
+
+  <!-- Экран 3: результат -->
+  <section class="screen scroll" id="s-result">
+    <h2 class="res-title" id="res-title"></h2>
+    <div class="score"><b id="res-score">0</b><span>из 300</span></div>
+    <div class="wd-prize-m" aria-hidden="true"></div>
+    <div class="res-body">
+      <div class="res-tower" id="res-box"><canvas id="res-tower" aria-hidden="true"></canvas></div>
+      <div class="res-stats">
+        <div class="stat gold"><span>Ровно</span><b id="st-perfect">0</b></div>
+        <div class="stat"><span>Почти ровно</span><b id="st-near">0</b></div>
+        <div class="stat"><span>Криво</span><b id="st-ok">0</b></div>
+        <div class="stat"><span>Упало</span><b id="st-fall">0</b></div>
+        <div class="stat wide" id="st-day"></div>
+      </div>
+    </div>
+    <!-- Призовой талон (v3): слово дня — из WORDS_TOPPING / WORDS_DRINK; пока там заглушки, висит метка «прототип» -->
+    <div class="ticket" id="ticket" hidden>
+      <div class="ribbon" aria-hidden="true"></div>
+      <div class="ticket-tag" id="ticket-tag">прототип</div>
+      <div class="ticket-main" id="ticket-main"></div>
+      <div class="ticket-how">На кассе назови номер телефона и&nbsp;слово дня</div>
+      <div class="ticket-word" id="ticket-word"></div>
+      <div class="ticket-rule">Один приз в&nbsp;день на&nbsp;гостя</div>
+      <div class="ticket-stamp" id="stamp"></div>
+    </div>
+    <button class="btn" id="btn-again" type="button">Ещё раз</button>
+    <p class="note" id="res-left"></p>
+    <div class="tail"></div>
+  </section>
+
+  <!-- Экран 4: попытки на сегодня кончились -->
+  <section class="screen scroll" id="s-limit">
+    <h2 class="limit-title">На сегодня всё. Завтра новый напиток</h2>
+    <p class="limit-record" id="limit-record"></p>
+    <div class="profile">
+      <div class="profile-row"><span>Серия: <b id="streak2"></b></span><span>Коллекция: <b id="coll2"></b></span></div>
+      <div class="dots" id="dots2"></div>
+    </div>
+    <div class="tail"></div>
+  </section>
+
+  </main>
+
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/*<PURE>*/
+/* ===== Очки и призы: единые для всех игр WeDrink (SPEC v2 + дополнение v3) ===== */
+var MAX_SCORE = 300;       // максимум шкалы
+var PRIZE_TOPPING = 290;   // от 290 — топпинг в подарок
+var PRIZE_DRINK = 300;     // ровно 300 — напиток в подарок
+var ATTEMPTS_PER_DAY = 2;  // попыток в день
+var COLLECT_AT = 200;      // напиток дня «собран» в общем профиле от 200 очков
+var IS_PROTOTYPE = true;   // пока слова дня — заглушки, на призовом экране стоит метка «прототип»
+/* Слова дня для кассы: индекс — день недели (Date.getDay(), 0 — воскресенье). */
+var WORDS_TOPPING = ['СЛОВО-ВС', 'СЛОВО-ПН', 'СЛОВО-ВТ', 'СЛОВО-СР', 'СЛОВО-ЧТ', 'СЛОВО-ПТ', 'СЛОВО-СБ']; // PLACEHOLDER: слова выдаст касса
+var WORDS_DRINK = ['СЛОВО-ВС', 'СЛОВО-ПН', 'СЛОВО-ВТ', 'СЛОВО-СР', 'СЛОВО-ЧТ', 'СЛОВО-ПТ', 'СЛОВО-СБ'];   // PLACEHOLDER: слова выдаст касса
+
+/* ===== Слова недели из общего файла (v5): ../config/words.json ===== */
+/* Единственный сетевой запрос игры. Таймаут 2,5 с. При любой ошибке, при открытии с диска (file://) и при неверной
+   форме (два массива по 7 непустых строк) остаются встроенные значения выше. Экран приза читает слова в момент показа. */
+function refreshTicketWords() {   // билет мог быть показан до ответа сервера (экран «попытки кончились»): обновить слова и метку
+  var ws = document.querySelectorAll('.ticket-word[data-wk]'), i, w, a, d, tags;
+  for (i = 0; i < ws.length; i++) {
+    w = ws[i]; a = w.getAttribute('data-wk') === 'drink' ? WORDS_DRINK : WORDS_TOPPING; d = parseInt(w.getAttribute('data-dow'), 10);
+    if (a[d]) w.textContent = a[d];
+  }
+  if (!IS_PROTOTYPE) { tags = document.querySelectorAll('.ticket-tag'); for (i = 0; i < tags.length; i++) tags[i].style.display = "none"; }
+}
+function onWeekWords() { try { refreshTicketWords(); var p = document.getElementById('proto'); if (p) p.hidden = !IS_PROTOTYPE; } catch (e) { /* элемент ещё не готов */ } }
+(function loadWeekWords() {
+  try {
+    if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
+    var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 2500);
+    var okList = function (a) {
+      if (!Array.isArray(a) || a.length !== 7) return false;
+      for (var i = 0; i < 7; i++) { if (typeof a[i] !== 'string' || !a[i].trim() || a[i].length > 40 || /[<>]/.test(a[i])) return false; }
+      return true;
+    };
+    fetch('../config/words.json?v=' + Math.floor(Date.now() / 86400000), ctl ? { signal: ctl.signal } : undefined)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (o) {
+        if (!o || !okList(o.topping) || !okList(o.drink)) return;
+        WORDS_TOPPING = o.topping.map(function (s) { return s.trim(); });
+        WORDS_DRINK = o.drink.map(function (s) { return s.trim(); });
+        if (typeof o.prototype === 'boolean') IS_PROTOTYPE = o.prototype;
+        onWeekWords();
+      })
+      .catch(function () { /* молча: остаются встроенные слова */ })
+      .then(function () { clearTimeout(timer); });
+  } catch (e) { /* остаются встроенные слова */ }
+})();
+
+
+/* ===== Механика «Башни стаканов» =====
+   Единица длины — верхняя ширина стакана (ш). Скорости — в ш/с, поэтому сложность одинакова на любом экране. */
+var SLUG = 'bashnya-stakanov';
+var CUPS = 10;             // стаканов за попытку
+var PTS_PER_CUP = 30;      // «Ровно!» = 30; 10 × 30 = MAX_SCORE
+var CH = 1.6;              // высота стакана к верхней ширине (общая геометрия пяти игр v3)
+var RANGE = 1.7;           // стакан ездит на ±RANGE от центра верхнего стакана
+var GAP = 0.5;             // высота полёта над башней
+var FALL_AT = 0.5;         // смещение больше половины ширины — стакан падает
+var MIN_PTS = 3;           // очки за стакан на самом краю (смещение 0,5)
+var NEAR_MAX = 26;         // потолок очков за стакан, поставленный не «Ровно!»: промах стоит минимум 4 очка
+var CURVE = 1.5;           // крутизна кривой очков
+var NEAR_PTS = 21;         // от 21 очка подпись «Почти ровно»
+var OK_PTS = 12;           // от 12 — «Кривовато», ниже — «На краю»
+var SWAY_MAX = 0.4;        // потолок размаха верхушки башни
+var START_S = 0.8, DROP_S = 0.14, SETTLE_S = 0.95, END_S = 1.3; // длительности фаз, с
+var FALL_S = 1.0;          // типичное время падения стакана (в игре — пока не улетит за нижний край)
+var AUTO_DROP_S = 4;       // стакан опускается сам, если не тапнуть
+var TAP_GUARD_S = 0.15;    // защита от случайного двойного тапа
+
+/* Три набора сложности дня. vStart → vEnd — скорость стакана от первого к десятому, jit — разброс скорости от сида
+   (каждый стакан летит со своей скоростью, ритм не заучить); tol — допуск «Ровно!» в ширинах;
+   swayBase — башня слегка покачивается всегда, swayK — и сильнее от накопленных смещений; swayHz — частота.
+   Окно «Ровно!» по времени = tol / скорость: на ★★★ при ровной башне оно не уже ±17 мс даже при встречном покачивании
+   (шире одного кадра на 60 Гц). Баланс подогнан симуляцией под цели SPEC v3; сезон на него не влияет. */
+var DIFF = {
+  1: { vStart: 1.8, vEnd: 2.6, jit: 0.08, tol: 0.063, swayBase: 0.05, swayK: 0.5, swayHz: 0.40 },
+  2: { vStart: 2.2, vEnd: 3.0, jit: 0.10, tol: 0.067, swayBase: 0.09, swayK: 0.6, swayHz: 0.45 },
+  3: { vStart: 2.7, vEnd: 3.3, jit: 0.10, tol: 0.070, swayBase: 0.13, swayK: 0.7, swayHz: 0.50 }
+};
+
+/* Меню: названия точно как в меню WeDrink (без объёма и цены). Состав — cards/menu_data.py. */
+var MENU = {
+  classic:   'Классический молочный чай',
+  tapioca:   'Молочный чай с тапиокой',
+  dbl:       'Двойной молочный чай',
+  coconut:   'Молочный чай с кокосом',
+  oreo:      'Oreo молочный чай',
+  grape:     'Виноградно-лимонный чай',
+  lemon:     'Чёрный чай с лимоном',
+  cheese:    'Клубничный чай с сырной пенкой',
+  peach:     'Персиковый чай с сырной пенкой',
+  choco:     'Шоколадный кокосовый чай',
+  strawcoco: 'Клубничный кокосовый чай'
+};
+var MENU_KINDS = ['classic', 'tapioca', 'dbl', 'coconut', 'oreo', 'grape', 'lemon', 'cheese', 'peach', 'choco', 'strawcoco'];
+/* По меню бывают горячими: молочные чаи, чёрный чай с лимоном, кокосовые чаи. Зимой они с паром; остальные — холодные, с инеем. */
+var HOT = { classic: 1, tapioca: 1, dbl: 1, coconut: 1, oreo: 1, lemon: 1, choco: 1, strawcoco: 1 };
+/* Сезон (SPEC v4): с 15 ноября по 28 февраля — зима. Меняет только вид; механика, очки и баланс от сезона не зависят. */
+function seasonByDate(d) {
+  var m = d.getMonth() + 1, day = d.getDate();
+  return ((m === 11 && day >= 15) || m === 12 || m === 1 || (m === 2 && day <= 28)) ? 'winter' : 'default';
+}
+/* Напиток дня по дню недели локальной даты (индекс = Date.getDay(), 0 — воскресенье). */
+var DAYS = [
+  { kind: 'choco', stars: 3 },     // Вс
+  { kind: 'classic', stars: 1 },   // Пн
+  { kind: 'tapioca', stars: 1 },   // Вт
+  { kind: 'grape', stars: 2 },     // Ср
+  { kind: 'dbl', stars: 2 },       // Чт
+  { kind: 'cheese', stars: 3 },    // Пт
+  { kind: 'oreo', stars: 2 }       // Сб
+];
+var DOW_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+function hashStr(s) {
+  var h = 2166136261 >>> 0;
+  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+/* Детерминированный генератор: сид от даты и номера попытки, перезагрузка попытку не «перебрасывает». */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function tri(p) { p -= Math.floor(p); return p < 0.25 ? 4 * p : p < 0.75 ? 2 - 4 * p : 4 * p - 4; }
+
+/* Очки за один стакан. d — смещение центра от центра крышки верхнего стакана, в ширинах; tol — допуск «Ровно!».
+   d ≤ tol → 30;  tol < d ≤ 0,5 → round(3 + 23 × s^1,5), где s = 1 − (d − tol) / (0,5 − tol);  d > 0,5 → 0. */
+function cupPoints(d, tol) {
+  if (d > FALL_AT) return 0;
+  if (d <= tol) return PTS_PER_CUP;
+  var s = 1 - (d - tol) / (FALL_AT - tol);
+  var p = Math.round(MIN_PTS + (NEAR_MAX - MIN_PTS) * Math.pow(s, CURVE));
+  return Math.max(MIN_PTS, Math.min(NEAR_MAX, p));
+}
+function judge(off, tol) {
+  var d = Math.abs(off), pts = cupPoints(d, tol);
+  return { d: d, pts: pts, perfect: pts === PTS_PER_CUP, fall: pts === 0 };
+}
+function verdict(pts) {
+  if (pts >= PTS_PER_CUP) return { cls: 'perfect', text: 'Ровно!' };
+  if (pts >= NEAR_PTS) return { cls: 'near', text: 'Почти ровно' };
+  if (pts >= OK_PTS) return { cls: 'ok', text: 'Кривовато' };
+  if (pts > 0) return { cls: 'edge', text: 'На краю' };
+  return { cls: 'fall', text: 'Упал' };
+}
+function baseKind(dayKind) { return dayKind === 'classic' ? 'coconut' : 'classic'; }   // стакан на стойке
+/* Расписание попытки — всё от сида: скорость каждого стакана (рост от vStart к vEnd и свой разброс),
+   сторона вылета, фаза покачивания башни и напитки меню в стаканах. */
+function buildSchedule(seedStr, P, dayKind) {
+  var rng = mulberry32(hashStr(seedStr)), out = [], i;
+  for (i = 0; i < CUPS; i++) {
+    var base = P.vStart + (P.vEnd - P.vStart) * Math.pow(i / (CUPS - 1), 0.9);
+    var jit = 1 + (rng() * 2 - 1) * P.jit;
+    out.push({ v: base * jit, side: rng() < 0.5 ? -1 : 1, kind: null, straw: false });
+  }
+  out.phase = rng();                                   // с какой точки начинается покачивание
+  var prev = baseKind(dayKind);
+  for (i = 0; i < CUPS - 1; i++) {
+    var pool = [];
+    for (var m = 0; m < MENU_KINDS.length; m++) if (MENU_KINDS[m] !== prev && MENU_KINDS[m] !== dayKind) pool.push(MENU_KINDS[m]);
+    prev = pool[Math.floor(rng() * pool.length)];
+    out[i].kind = prev;
+  }
+  out[CUPS - 1].kind = dayKind;   // десятый — напиток дня, с трубочкой
+  out[CUPS - 1].straw = true;
+  return out;
+}
+/* Где летящий стакан относительно центра верхнего: туда-обратно с постоянной скоростью, старт у края. */
+function hoverOffset(h, t) { return RANGE * tri(h.p0 + (t - h.t0) * h.v / (4 * RANGE)); }
+/* Насколько уехала крышка стакана на уровне level из-за покачивания (башня качается как стержень от стойки). */
+function lidSway(amp, hz, level, t, phase) { return amp * (level / CUPS) * Math.sin(2 * Math.PI * (hz * t + phase)); }
+function swayTarget(P, accum) { return Math.min(SWAY_MAX, P.swayBase + P.swayK * accum); }
+function dayInfo(now) {
+  var dow = now.getDay(), d = DAYS[dow];
+  return { dow: dow, name: MENU[d.kind], stars: d.stars, kind: d.kind, P: DIFF[d.stars] };
+}
+/*</PURE>*/
+
+/* ===== Мелочи ===== */
+function $(id) { return document.getElementById(id); }
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+function dayStr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function prevDayStr(d) { return dayStr(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1)); }
+function plural(n, one, few, many) {
+  var a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b === 1) return one;
+  if (b >= 2 && b <= 4) return few;
+  return many;
+}
+function starsStr(n) { var s = ''; for (var i = 0; i < 3; i++) s += i < n ? '★' : '☆'; return s; }
+function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+function hexRgb(h) {
+  h = String(h).replace('#', '');
+  if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+  var n = parseInt(h, 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgba(hex, a) { var v = hexRgb(hex); return 'rgba(' + v[0] + ',' + v[1] + ',' + v[2] + ',' + a + ')'; }
+
+var REDUCED = false;       // prefers-reduced-motion: без тряски, мерцания и с меньшим числом частиц
+try { REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
+
+/* Сезон (SPEC v4): 'winter' или 'default'. По умолчанию — по дате; для проверки ?season=winter или ?season=default. */
+var SEASON = (function () {
+  var q = String(window.location.search || '');
+  if (q.indexOf('season=winter') !== -1) return 'winter';
+  if (q.indexOf('season=default') !== -1) return 'default';
+  return seasonByDate(new Date());
+})();
+var WINTER = SEASON === 'winter';
+
+/* Потолки частиц */
+var MAX_PARTICLES = REDUCED ? 36 : 140;                                       // капли, искры, снежная пыль в игре
+var SNOW_COUNT = WINTER ? (REDUCED ? [6, 4, 2] : [26, 18, 10]) : [0, 0, 0];   // снег за окном: три слоя с параллаксом
+var FX_MAX = REDUCED ? 24 : 110;                                              // салют на призовом экране
+var vrand = mulberry32(20261116);   // генератор только для украшений (брызги, пузырьки); на очки не влияет
+
+/* ===== Хранилище: всё в try/catch; без него игра идёт без лимита ===== */
+var KEY_GAME = 'wedrink.' + SLUG + '.v2';     // { day, used, best } — попытки и рекорд дня этой игры
+var KEY_PROFILE = 'wedrink.profile.v1';       // общий профиль всех игр: { streak, lastDay, collection }
+var storageOK = (function () {
+  try { var k = 'wedrink.__probe'; window.localStorage.setItem(k, '1'); window.localStorage.removeItem(k); return true; }
+  catch (e) { return false; }
+})();
+function readJSON(key) {
+  try {
+    var s = window.localStorage.getItem(key);
+    if (!s) return null;
+    var o = JSON.parse(s);
+    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : null;
+  } catch (e) { return null; }
+}
+function writeJSON(key, obj) { try { window.localStorage.setItem(key, JSON.stringify(obj)); return true; } catch (e) { return false; } }
+
+var memState = null, memProfile = {};
+function gameState(now) {
+  var today = dayStr(now), o = storageOK ? readJSON(KEY_GAME) : memState;
+  if (!o || o.day !== today) o = { day: today, used: 0, best: 0 };
+  o.used = Math.max(0, parseInt(o.used, 10) || 0);
+  o.best = clamp(parseInt(o.best, 10) || 0, 0, MAX_SCORE);
+  return o;
+}
+function saveGameState(o) { if (storageOK) writeJSON(KEY_GAME, o); else memState = o; }
+function attemptsLeft(o) { return storageOK ? Math.max(0, ATTEMPTS_PER_DAY - o.used) : Infinity; }
+
+/* Общий профиль: читаем весь объект, меняем только свои поля, чужие не трогаем. */
+function readProfile() { return storageOK ? (readJSON(KEY_PROFILE) || {}) : memProfile; }
+function saveProfile(p) { if (storageOK) writeJSON(KEY_PROFILE, p); else memProfile = p; }
+function collectionOf(p) {
+  return (p.collection && typeof p.collection === 'object' && !Array.isArray(p.collection)) ? p.collection : null;
+}
+function profileView(now) {
+  var p = readProfile(), today = dayStr(now), yest = prevDayStr(now);
+  var streak = (p.lastDay === today || p.lastDay === yest) ? Math.max(0, parseInt(p.streak, 10) || 0) : 0;
+  var col = collectionOf(p) || {}, got = [], n = 0;
+  for (var i = 0; i < 7; i++) { got[i] = (parseInt(col[String(i)], 10) || 0) >= COLLECT_AT; if (got[i]) n++; }
+  return { streak: streak, got: got, count: n };
+}
+function profileOnPlay(now) {
+  var p = readProfile(), today = dayStr(now), yest = prevDayStr(now);
+  var s = Math.max(0, parseInt(p.streak, 10) || 0);
+  if (p.lastDay === today) s = Math.max(1, s);       // сегодня уже играл
+  else if (p.lastDay === yest) s = s + 1;            // играл вчера — серия растёт
+  else s = 1;                                        // пропуск дня — серия с начала
+  p.streak = s; p.lastDay = today;
+  if (!collectionOf(p)) p.collection = {};
+  saveProfile(p);
+}
+function profileOnScore(dow, score) {
+  var p = readProfile();
+  if (!collectionOf(p)) p.collection = {};
+  var k = String(dow), old = parseInt(p.collection[k], 10) || 0;
+  if (score > old) { p.collection[k] = score; saveProfile(p); }
+}
+
+/* ===== Цвета из :root и вид напитков ===== */
+var C = {}, DRINKS = {};
+var FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
+function loadColors() {
+  var cs = window.getComputedStyle(document.documentElement);
+  function v(name, fb) { var s = cs.getPropertyValue(name); s = s ? String(s).trim() : ''; return s || fb; }
+  C = {
+    brand: v('--brand', '#1B8F8E'), brandDark: v('--brand-dark', '#156F6E'), brandLight: v('--brand-light', '#43B9B5'),
+    accent: v('--accent', '#DC223C'), sun: v('--sun', '#FFD45C'), sunDeep: v('--sun-deep', '#F2B01E'),
+    wood: v('--wood', '#EAD4A9'), woodDark: v('--wood-dark', '#C9A772'), lamp: v('--lamp', '#FFE9A8'),
+    milkTop: v('--milk-tea-top', '#F0DCC0'), milkBot: v('--milk-tea-bot', '#C99668'), dblBot: v('--dbl-bot', '#A9703F'),
+    teaTop: v('--tea-top', '#DB9850'), teaBot: v('--tea-bot', '#8E4A20'),
+    grapeTop: v('--grape-top', '#E3CDEB'), grapeBot: v('--grape-bot', '#7B479C'),
+    strawTop: v('--strawberry-top', '#F9BAC5'), strawBot: v('--strawberry-bot', '#E5627C'),
+    peachTop: v('--peach-top', '#FBD3A4'), peachBot: v('--peach-bot', '#F09A52'),
+    oreoTop: v('--oreo-top', '#E5D8C8'), oreoBot: v('--oreo-bot', '#BBA084'),
+    chocoTop: v('--choco-top', '#BC8F6A'), chocoBot: v('--choco-bot', '#55301D'), cocoMilk: v('--coconut-milk', '#FFF6E9'),
+    scTop: v('--strawcoco-top', '#FCDDE2'), scBot: v('--strawcoco-bot', '#EE9CB0'),
+    tapioca: v('--tapioca', '#3B2519'), tapiocaHi: v('--tapioca-hi', '#8A6044'),
+    bean: v('--red-bean', '#7E2F33'), beanHi: v('--red-bean-hi', '#B5565A'),
+    cocoJelly: v('--coconut-jelly', '#FFFDF2'), peachJelly: v('--peach-jelly', '#FFB870'), oreo: v('--oreo', '#2B2626'),
+    foam: v('--cheese-foam', '#FFF3CC'), foamShade: v('--foam-shade', '#EBCF86'),
+    lemon: v('--lemon', '#F9E06A'), lemonRind: v('--lemon-rind', '#F2C230')
+  };
+  /* Каждый стакан — позиция меню. Состав по menu_data.py, ничего придуманного:
+     balls — круглые добавки с физикой (жемчужная тапиока, красная фасоль), cubes — желе (кокосовое, персиковое),
+     lemons — дольки лимона, crumbs — крошка Oreo, foam — шапка сырной пенки, swirl — кокосовое молоко. */
+  DRINKS = {
+    classic:   { top: C.milkTop, bot: C.milkBot },                                             // молочная основа, чёрный чай
+    tapioca:   { top: C.milkTop, bot: C.milkBot, balls: [['pearl', 10]] },                     // + жемчужная тапиока
+    dbl:       { top: C.milkTop, bot: C.dblBot, balls: [['pearl', 6], ['bean', 6]] },          // + тапиока и красная фасоль
+    coconut:   { top: C.milkTop, bot: C.milkBot, cubes: ['coco', 6] },                         // + кокосовые дольки
+    oreo:      { top: C.oreoTop, bot: C.oreoBot, crumbs: 18 },                                 // молочный чай с Oreo
+    grape:     { top: C.grapeTop, bot: C.grapeBot, lemons: 2, cubes: ['coco', 4], clear: 1 },  // жасминовый чай, виноградный джем, лимон, кокосовые дольки
+    lemon:     { top: C.teaTop, bot: C.teaBot, lemons: 3, clear: 1 },                          // чёрный чай, ломтики лимона
+    cheese:    { top: C.strawTop, bot: C.strawBot, foam: 1, cubes: ['peach', 5] },             // жасминовый чай, персиковое желе, сырная пенка, клубничный вкус
+    peach:     { top: C.peachTop, bot: C.peachBot, foam: 1, cubes: ['peach', 5] },             // то же, персиковый вкус
+    choco:     { top: C.chocoTop, bot: C.chocoBot, swirl: C.cocoMilk },                        // чай на кокосовом молоке
+    strawcoco: { top: C.scTop, bot: C.scBot, swirl: C.cocoMilk }                               // чай на кокосовом молоке
+  };
+}
+
+/* ===== Наш стакан =====
+   Геометрия общая для игр v3: сужается книзу, высота к верхней ширине 1,6. Всё в ширинах; начало — середина дна, y вверх. */
+var TW = 0.46, BW = 0.33;            // полуширина стекла у крышки и у дна
+var LID_H = 0.085;                   // толщина бирюзовой плёнки-крышки
+var BODY_TOP = CH - LID_H * 0.5;     // верх стекла
+var LIQ = 1.27;                      // уровень напитка в покое
+var FOAM_T = 0.17;                   // толщина сырной пенки
+var NODES = 9;                       // узлы поверхности жидкости (пружинная модель)
+function halfW(y) { return BW + (TW - BW) * clamp(y / BODY_TOP, 0, 1); }
+
+function rr(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r);
+  c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  c.lineTo(x + r, y + h); c.quadraticCurveTo(x, y + h, x, y + h - r);
+  c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+}
+function bodyPath(c, w) {
+  var tw = TW * w, bw = BW * w, r = 0.075 * w, yT = -BODY_TOP * w, k = (tw - bw) * (r / -yT);
+  c.beginPath();
+  c.moveTo(-tw, yT); c.lineTo(tw, yT);
+  c.lineTo(bw + k, -r); c.quadraticCurveTo(bw, 0, bw - r, 0);
+  c.lineTo(-bw + r, 0); c.quadraticCurveTo(-bw, 0, -bw - k, -r);
+  c.closePath();
+}
+/* Задний слой: тень под стаканом и само стекло. */
+function paintBack(c, w) {
+  c.save(); c.translate(0, w * 0.01); c.scale(1, 0.13);
+  var g = c.createRadialGradient(0, 0, 0, 0, 0, w * 0.52);
+  g.addColorStop(0, WINTER ? 'rgba(2,16,30,.55)' : 'rgba(21,60,60,.36)'); g.addColorStop(1, 'rgba(21,60,60,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, w * 0.52, 0, 6.2832); c.fill(); c.restore();
+  bodyPath(c, w);
+  var gg = c.createLinearGradient(-TW * w, 0, TW * w, 0);
+  gg.addColorStop(0, 'rgba(255,255,255,.66)'); gg.addColorStop(0.5, 'rgba(255,255,255,.4)'); gg.addColorStop(1, 'rgba(236,250,248,.58)');
+  c.fillStyle = gg; c.fill();
+}
+function paintLabel(c, w, yc) {          // надпись «WeDrink» на стенке
+  var fs = w * 0.16, ly = -yc * w;
+  c.font = '900 ' + fs + 'px ' + FONT;
+  var tw = c.measureText('WeDrink').width, maxW = w * 0.56;
+  if (tw > maxW) { fs *= maxW / tw; c.font = '900 ' + fs + 'px ' + FONT; tw = maxW; }
+  var pw = tw + w * 0.1, ph = fs * 1.5;
+  c.fillStyle = 'rgba(21,60,60,.14)'; rr(c, -pw / 2, ly - ph / 2 + w * 0.012, pw, ph, ph * 0.34); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.94)'; rr(c, -pw / 2, ly - ph / 2, pw, ph, ph * 0.34); c.fill();
+  c.fillStyle = C.brand; c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (fs >= 4.5) c.fillText('WeDrink', 0, ly + fs * 0.06);
+  else c.fillRect(-tw / 2, ly - fs * 0.22, tw, fs * 0.44);     // на совсем мелком стакане — бирюзовая полоска
+}
+/* Зима: вязаная манжета-«свитер» в фирменных цветах, надпись — на светлой полосе. */
+function paintSleeve(c, w) {
+  var ya = 0.42, yb = 0.96, e = 0.014, i, x, y, g, m0 = 0.6, m1 = 0.78;
+  function path() {
+    c.beginPath(); c.moveTo((-halfW(yb) - e) * w, -yb * w); c.lineTo((halfW(yb) + e) * w, -yb * w);
+    c.lineTo((halfW(ya) + e) * w, -ya * w); c.lineTo((-halfW(ya) - e) * w, -ya * w); c.closePath();
+  }
+  function zig(yc, amp) {
+    c.beginPath();
+    for (i = 0, x = -0.51; x <= 0.52; x += 0.06, i++) { if (i === 0) c.moveTo(x * w, -(yc - amp) * w); else c.lineTo(x * w, -(yc + (i % 2 ? amp : -amp)) * w); }
+    c.stroke();
+  }
+  c.save(); path(); c.clip();
+  g = c.createLinearGradient(-0.5 * w, 0, 0.5 * w, 0);
+  g.addColorStop(0, C.brandDark); g.addColorStop(0.3, C.brandLight); g.addColorStop(0.62, C.brand); g.addColorStop(1, '#0E5756');
+  c.fillStyle = g; c.fillRect(-0.6 * w, -yb * w, 1.2 * w, (yb - ya) * w);
+  c.fillStyle = C.cocoMilk; c.fillRect(-0.6 * w, -m1 * w, 1.2 * w, (m1 - m0) * w);
+  c.fillStyle = C.accent; c.fillRect(-0.6 * w, -(m1 + 0.028) * w, 1.2 * w, 0.028 * w); c.fillRect(-0.6 * w, -m0 * w, 1.2 * w, 0.028 * w);
+  c.strokeStyle = 'rgba(255,255,255,.92)'; c.lineWidth = Math.max(1, w * 0.022); c.lineJoin = 'miter';
+  zig(0.875, 0.032); zig(0.505, 0.032);
+  c.fillStyle = 'rgba(6,56,56,.3)'; c.fillRect(-0.6 * w, -yb * w, 1.2 * w, 0.04 * w); c.fillRect(-0.6 * w, -(ya + 0.04) * w, 1.2 * w, 0.04 * w);
+  for (i = 0, x = -0.5; x < 0.5; x += 0.042, i++) {              // вязка: столбики
+    c.fillStyle = i % 2 ? 'rgba(255,255,255,.11)' : 'rgba(0,40,40,.11)'; c.fillRect(x * w, -yb * w, 0.021 * w, (yb - ya) * w);
+  }
+  c.fillStyle = 'rgba(0,40,40,.07)';                             // вязка: ряды петель
+  for (y = ya; y < yb; y += 0.036) c.fillRect(-0.6 * w, -y * w, 1.2 * w, Math.max(0.5, 0.008 * w));
+  var fs = (m1 - m0) * w * 0.74, ly = -(m0 + m1) / 2 * w;
+  c.font = '900 ' + fs + 'px ' + FONT;
+  var tw = c.measureText('WeDrink').width, maxW = w * 0.6;
+  if (tw > maxW) { fs *= maxW / tw; c.font = '900 ' + fs + 'px ' + FONT; tw = maxW; }
+  c.fillStyle = C.brandDark; c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (fs >= 4.5) c.fillText('WeDrink', 0, ly + fs * 0.06); else c.fillRect(-tw / 2, ly - fs * 0.22, tw, fs * 0.44);
+  c.restore();
+  path(); c.strokeStyle = 'rgba(6,50,50,.6)'; c.lineWidth = Math.max(0.8, w * 0.016); c.lineJoin = 'round'; c.stroke();
+}
+/* Зима: иней по краям стекла у холодных напитков (рисуется внутри контура стакана). */
+function paintFrost(c, w) {
+  var h = CH * w, g, i, k, r = mulberry32(4242);
+  g = c.createLinearGradient(-TW * w, 0, TW * w, 0);
+  g.addColorStop(0, 'rgba(255,255,255,.82)'); g.addColorStop(0.13, 'rgba(255,255,255,.24)'); g.addColorStop(0.27, 'rgba(255,255,255,0)');
+  g.addColorStop(0.73, 'rgba(255,255,255,0)'); g.addColorStop(0.87, 'rgba(255,255,255,.24)'); g.addColorStop(1, 'rgba(255,255,255,.82)');
+  c.fillStyle = g; c.fillRect(-w * 0.5, -h, w, h);
+  g = c.createLinearGradient(0, -0.36 * w, 0, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.62)');
+  c.fillStyle = g; c.fillRect(-w * 0.5, -0.36 * w, w, 0.36 * w);
+  c.strokeStyle = 'rgba(255,255,255,.92)'; c.lineWidth = Math.max(0.6, w * 0.01); c.lineCap = 'round';
+  for (i = 0; i < 28; i++) {
+    var y = 0.05 + r() * (BODY_TOP - 0.1), side = r() < 0.5 ? -1 : 1, x = side * (halfW(y) - 0.02 - r() * r() * 0.13);
+    var s = (0.012 + r() * 0.022) * w, a0 = r() * 3.14;
+    for (k = 0; k < 3; k++) {
+      var a = a0 + k * 1.0472;
+      c.beginPath(); c.moveTo(x * w - Math.cos(a) * s, -y * w - Math.sin(a) * s); c.lineTo(x * w + Math.cos(a) * s, -y * w + Math.sin(a) * s); c.stroke();
+    }
+  }
+}
+function paintLid(c, w) {                // бирюзовая плёнка с блеском
+  var h = CH * w, lh = LID_H * w, lw = Math.max(1, w * 0.026), g;
+  c.fillStyle = C.brandDark; c.fillRect(-0.468 * w, -h + lh * 0.9, 0.936 * w, lh * 0.55);
+  g = c.createLinearGradient(0, -h, 0, -h + lh);
+  g.addColorStop(0, C.brandLight); g.addColorStop(0.55, C.brand); g.addColorStop(1, C.brandDark);
+  rr(c, -0.5 * w, -h, w, lh, lh * 0.45); c.fillStyle = g; c.fill();
+  g = c.createLinearGradient(-0.5 * w, 0, 0.5 * w, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.22, 'rgba(255,255,255,.62)'); g.addColorStop(0.4, 'rgba(255,255,255,.05)');
+  g.addColorStop(0.75, 'rgba(255,255,255,.24)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; rr(c, -0.46 * w, -h + lh * 0.16, 0.92 * w, lh * 0.3, lh * 0.15); c.fill();
+  rr(c, -0.5 * w, -h, w, lh, lh * 0.45); c.lineWidth = lw; c.strokeStyle = WINTER ? 'rgba(8,60,62,.9)' : C.brandDark; c.stroke();
+}
+/* Передний слой: преломление у стенок, толстое дно, блики, контур, надпись, плёнка.
+   mode: 0 — обычный вид, 1 — зима, горячий (манжета), 2 — зима, холодный (манжета и иней). */
+function paintFront(c, w, mode) {
+  var h = CH * w, lw = Math.max(1, w * 0.026), g;
+  c.save(); bodyPath(c, w); c.clip();
+  g = c.createLinearGradient(-TW * w, 0, TW * w, 0);
+  g.addColorStop(0, 'rgba(12,70,70,.22)'); g.addColorStop(0.07, 'rgba(255,255,255,.34)'); g.addColorStop(0.2, 'rgba(255,255,255,.05)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0)'); g.addColorStop(0.8, 'rgba(12,70,70,.05)'); g.addColorStop(0.93, 'rgba(255,255,255,.18)'); g.addColorStop(1, 'rgba(12,70,70,.26)');
+  c.fillStyle = g; c.fillRect(-w * 0.5, -h, w, h);
+  c.fillStyle = 'rgba(255,255,255,.36)'; c.fillRect(-w * 0.5, -w * 0.055, w, w * 0.06);
+  c.fillStyle = 'rgba(12,70,70,.12)'; c.fillRect(-w * 0.5, -w * 0.066, w, w * 0.012);
+  if (mode === 2) paintFrost(c, w);
+  c.restore();
+  g = c.createLinearGradient(0, -BODY_TOP * w, 0, 0);
+  g.addColorStop(0, 'rgba(255,255,255,.8)'); g.addColorStop(1, 'rgba(255,255,255,.2)');
+  c.fillStyle = g; c.beginPath();
+  c.moveTo((-halfW(1.36) + 0.07) * w, -1.36 * w); c.lineTo((-halfW(1.36) + 0.135) * w, -1.36 * w);
+  c.lineTo((-halfW(0.16) + 0.115) * w, -0.16 * w); c.lineTo((-halfW(0.16) + 0.075) * w, -0.16 * w); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.34)'; c.beginPath();
+  c.moveTo((halfW(1.3) - 0.085) * w, -1.3 * w); c.lineTo((halfW(1.3) - 0.06) * w, -1.3 * w);
+  c.lineTo((halfW(0.5) - 0.06) * w, -0.5 * w); c.lineTo((halfW(0.5) - 0.078) * w, -0.5 * w); c.closePath(); c.fill();
+  bodyPath(c, w); c.lineWidth = lw; c.lineJoin = 'round'; c.strokeStyle = WINTER ? 'rgba(214,246,244,.82)' : 'rgba(21,111,110,.78)'; c.stroke();
+  if (mode) paintSleeve(c, w); else paintLabel(c, w, 0.66);
+  paintLid(c, w);
+}
+
+/* Слои стакана рисуем один раз под нужный размер, дальше — drawImage. Жидкость и добавки — живые, каждый кадр. */
+var dpr = 1, layers = {}, layerCount = 0, glows = {}, grads = {}, gradCount = 0;
+function getLayer(name, wCss) {
+  var px = Math.max(10, Math.round(wCss * dpr)), key = name + '@' + px, s = layers[key];
+  if (s) return s;
+  if (layerCount > 28) { layers = {}; layerCount = 0; }
+  var sw = Math.ceil(px * 1.2), sh = Math.ceil(px * (CH + 0.16));
+  var el = document.createElement('canvas'); el.width = sw; el.height = sh;
+  var c = el.getContext('2d'), ox = sw / 2, oy = sh - Math.ceil(px * 0.1);
+  c.translate(ox, oy);
+  if (name === 'back') paintBack(c, px); else paintFront(c, px, name === 'f2' ? 2 : name === 'f1' ? 1 : 0);
+  s = layers[key] = { el: el, ox: ox / px, oy: oy / px, w: sw / px, h: sh / px };
+  layerCount++;
+  return s;
+}
+function frontName(kind) { return !WINTER ? 'f0' : HOT[kind] ? 'f1' : 'f2'; }
+/* Мягкое пятно света: вспышка, лампы, огни гирлянды, пар. Готовится один раз на цвет. */
+function glowSprite(col) {
+  var s = glows[col];
+  if (s) return s;
+  s = document.createElement('canvas'); s.width = 64; s.height = 64;
+  var c = s.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, rgba(col, 1)); g.addColorStop(0.35, rgba(col, 0.5)); g.addColorStop(1, rgba(col, 0));
+  c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+  glows[col] = s;
+  return s;
+}
+function liquidGrad(c, kind, w, D) {
+  var key = kind + '@' + w.toFixed(1) + (c._tag || ''), g = grads[key];
+  if (g) return g;
+  if (gradCount > 80) { grads = {}; gradCount = 0; }
+  g = c.createLinearGradient(0, -LIQ * w, 0, 0);
+  g.addColorStop(0, D.top); g.addColorStop(1, D.bot);
+  grads[key] = g; gradCount++;
+  return g;
+}
+function fitCanvas(el) {
+  var w = Math.max(1, el.clientWidth | 0), h = Math.max(1, el.clientHeight | 0);
+  dpr = Math.min(3, window.devicePixelRatio || 1);
+  var pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+  if (el.width !== pw) el.width = pw;
+  if (el.height !== ph) el.height = ph;
+  var c = el.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { c: c, w: w, h: h };
+}
+
+/* ----- Живой стакан: состояние ----- */
+function makeCup(kind, straw, x) {
+  var D = DRINKS[kind] || DRINKS.classic, i, k;
+  var cup = {
+    x: x, kind: kind, straw: !!straw, pts: -1,
+    sq: 0, vsq: 0,            // пружинное проседание при посадке
+    rk: 0, vrk: 0,            // покачивание после кривой посадки
+    glow: 0, ph: vrand() * 6.2832,
+    liq: { h: [], v: [], tilt: 0, vt: 0, level: LIQ },
+    balls: [], cubes: [], lemons: [], crumbs: [], bub: []
+  };
+  for (i = 0; i < NODES; i++) { cup.liq.h.push(0); cup.liq.v.push(0); }
+  if (D.balls) {
+    for (k = 0; k < D.balls.length; k++) for (i = 0; i < D.balls[k][1]; i++) {
+      var bean = D.balls[k][0] === 'bean';
+      cup.balls.push({ x: (vrand() - 0.5) * 0.5, y: 0.1 + vrand() * 0.6, vx: 0, vy: 0, r: bean ? 0.05 : 0.062, bean: bean, a: vrand() * 3.14 });
+    }
+    for (i = 0; i < 90; i++) stepBalls(cup, 1 / 60, 0);          // дать шарикам улечься на дно
+  }
+  if (D.cubes) for (i = 0; i < D.cubes[1]; i++) {
+    var cy = 0.14 + vrand() * (LIQ - (D.foam ? 0.62 : 0.42));
+    cup.cubes.push({ x: (vrand() * 2 - 1) * (halfW(cy) - 0.13), y: cy, rot: vrand() * 1.57, s: 0.105 + vrand() * 0.035, ph: vrand() * 6.2832, peach: D.cubes[0] === 'peach' });
+  }
+  if (D.lemons) for (i = 0; i < D.lemons; i++) {
+    cup.lemons.push({ x: (i % 2 ? 0.2 : -0.21) + (vrand() - 0.5) * 0.06, y: LIQ - 0.2 - i * 0.3 - vrand() * 0.05, r: 0.115 + vrand() * 0.012, rot: vrand() * 3.14, ph: vrand() * 6.2832 });
+  }
+  if (D.crumbs) for (i = 0; i < D.crumbs; i++) {
+    var fl = i < 6, yy = fl ? 0 : 0.08 + vrand() * (LIQ - 0.2);
+    cup.crumbs.push({ x: (vrand() * 2 - 1) * (halfW(fl ? LIQ : yy) - 0.06), y: yy, r: 0.012 + vrand() * 0.02, fl: fl, ph: vrand() * 6.2832 });
+  }
+  return cup;
+}
+/* Шарики тапиоки и фасоль: круглые тела — гравитация, вязкость напитка, отскок от стенок и дна, столкновения между собой. */
+function stepBalls(cup, dt, ax) {
+  var b = cup.balls, n = b.length, i, j, p, q, it;
+  if (!n) return;
+  var drag = Math.exp(-2.4 * dt), top = cup.liq.level - 0.02;
+  for (i = 0; i < n; i++) {
+    p = b[i];
+    p.vy -= 3.4 * dt; p.vx -= ax * 0.5 * dt;
+    p.vx *= drag; p.vy *= drag;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (it = 0; it < 2; it++) {
+    for (i = 0; i < n; i++) {
+      p = b[i];
+      for (j = i + 1; j < n; j++) {
+        q = b[j];
+        var dx = q.x - p.x, dy = q.y - p.y, rs = p.r + q.r, d2 = dx * dx + dy * dy;
+        if (d2 < rs * rs && d2 > 1e-9) {
+          var d = Math.sqrt(d2), nx = dx / d, ny = dy / d, pen = (rs - d) * 0.5;
+          p.x -= nx * pen; p.y -= ny * pen; q.x += nx * pen; q.y += ny * pen;
+          var rv = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+          if (rv < 0) { var imp = -rv * 0.6; p.vx -= nx * imp; p.vy -= ny * imp; q.vx += nx * imp; q.vy += ny * imp; }
+        }
+      }
+      var floor = 0.03 + p.r, lim = halfW(p.y) - 0.035 - p.r;
+      if (p.y < floor) { p.y = floor; if (p.vy < 0) p.vy = -p.vy * 0.3; }
+      if (p.y > top - p.r) { p.y = top - p.r; if (p.vy > 0) p.vy = -p.vy * 0.2; }
+      if (p.x > lim) { p.x = lim; if (p.vx > 0) p.vx = -p.vx * 0.35; }
+      if (p.x < -lim) { p.x = -lim; if (p.vx < 0) p.vx = -p.vx * 0.35; }
+    }
+  }
+}
+/* Шаг физики стакана. ax — боковое ускорение стакана (ш/с²): от него жидкость наклоняется и плещется. */
+function stepCup(cup, dt, ax) {
+  var L = cup.liq, h = L.h, v = L.v, n = NODES, i, m = 0;
+  cup.vsq += (-430 * cup.sq - 21 * cup.vsq) * dt; cup.sq += cup.vsq * dt;
+  cup.vrk += (-230 * cup.rk - 7 * cup.vrk) * dt; cup.rk += cup.vrk * dt;
+  if (cup.glow > 0) cup.glow = cup.glow < 0.01 ? 0 : cup.glow * Math.exp(-4.5 * dt);
+  var target = clamp(-ax / 10, -0.45, 0.45) + clamp(cup.rk + (cup.lean || 0), -0.7, 0.7);
+  L.vt += (60 * (target - L.tilt) - 3.2 * L.vt) * dt; L.tilt = clamp(L.tilt + L.vt * dt, -0.75, 0.75);
+  for (i = 0; i < n; i++) {                                     // поверхность: пружины к уровню и связь с соседями
+    var a = h[i > 0 ? i - 1 : 0], b = h[i < n - 1 ? i + 1 : n - 1];
+    v[i] += (-85 * h[i] - 3 * v[i] + 240 * (a + b - 2 * h[i])) * dt;
+  }
+  for (i = 0; i < n; i++) { h[i] = clamp(h[i] + v[i] * dt, -0.3, 0.3); m += h[i]; }
+  m /= n;
+  for (i = 0; i < n; i++) h[i] -= m;                            // объём сохраняется
+  for (i = cup.bub.length - 1; i >= 0; i--) {                   // пузырьки всплывают
+    var bb = cup.bub[i];
+    bb.y += bb.vy * dt; bb.x += Math.sin(bb.y * 30 + bb.ph) * 0.05 * dt;
+    if (bb.y > L.level - 0.04) cup.bub.splice(i, 1);
+  }
+  stepBalls(cup, dt, ax);
+}
+/* Всплеск: удар по поверхности, толчок шарикам, пузырьки. side — в какую сторону качнуло. */
+function splashCup(cup, power, side) {
+  var L = cup.liq, n = NODES, i, sgn = vrand() < 0.5 ? -1 : 1;
+  for (i = 0; i < n; i++) {
+    L.v[i] += power * (0.75 * Math.cos(6.2832 * i / (n - 1)) + 0.35 * sgn * Math.cos(3.1416 * i / (n - 1)) + (vrand() - 0.5) * 0.5);
+  }
+  L.vt += side * power * 1.4;
+  for (i = 0; i < cup.balls.length; i++) {
+    var p = cup.balls[i];
+    p.vy += power * (0.35 + vrand() * 0.75); p.vx += (vrand() - 0.5) * power * 0.7 + side * power * 0.3;
+  }
+  var nb = REDUCED ? 1 : Math.min(4, Math.round(power * 2.2));
+  for (i = 0; i < nb && cup.bub.length < 7; i++) {
+    var by = 0.12 + vrand() * 0.5;
+    cup.bub.push({ x: (vrand() * 2 - 1) * (halfW(by) - 0.1), y: by, r: 0.014 + vrand() * 0.02, vy: 0.5 + vrand() * 0.5, ph: vrand() * 6 });
+  }
+}
+
+/* ----- Живой стакан: рисование ----- */
+var YS = [], YS2 = [];
+function surfAt(x) {
+  var f = clamp((x + 0.5) * (NODES - 1), 0, NODES - 1.001), i = Math.floor(f);
+  return YS[i] + (YS[i + 1] - YS[i]) * (f - i);
+}
+function surfCurve(c, w, ys, rev) {       // гладкая линия через середины отрезков
+  var n = NODES, i, x0, y0, x1, y1;
+  if (!rev) {
+    c.lineTo(-0.5 * w, -ys[0] * w);
+    for (i = 1; i < n; i++) {
+      x0 = ((i - 1) / (n - 1) - 0.5) * w; y0 = -ys[i - 1] * w; x1 = (i / (n - 1) - 0.5) * w; y1 = -ys[i] * w;
+      c.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+    }
+    c.lineTo(0.5 * w, -ys[n - 1] * w);
+  } else {
+    c.lineTo(0.5 * w, -ys[n - 1] * w);
+    for (i = n - 2; i >= 0; i--) {
+      x0 = ((i + 1) / (n - 1) - 0.5) * w; y0 = -ys[i + 1] * w; x1 = (i / (n - 1) - 0.5) * w; y1 = -ys[i] * w;
+      c.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+    }
+    c.lineTo(-0.5 * w, -ys[0] * w);
+  }
+}
+function paintLiquid(c, w, cup, t) {
+  var D = DRINKS[cup.kind] || DRINKS.classic, L = cup.liq, n = NODES, i, p, k;
+  var maxY = BODY_TOP - 0.03, lean = L.tilt * 0.16, a0 = c.globalAlpha;
+  for (i = 0; i < n; i++) YS[i] = clamp(L.level + L.tilt * (i / (n - 1) - 0.5) + L.h[i], 0.05, maxY);
+  c.save(); bodyPath(c, w); c.clip();
+  c.beginPath(); c.moveTo(-0.5 * w, 0.03 * w); surfCurve(c, w, YS, false); c.lineTo(0.5 * w, 0.03 * w); c.closePath();
+  if (D.clear) c.globalAlpha = a0 * 0.93;
+  c.fillStyle = liquidGrad(c, cup.kind, w, D); c.fill();
+  c.globalAlpha = a0;
+  if (D.swirl) {                                               // кокосовое молоко расходится мягкими разводами
+    c.globalAlpha = a0 * 0.3; c.strokeStyle = D.swirl; c.lineWidth = w * 0.085; c.lineCap = 'round';
+    for (i = 0; i < 2; i++) {
+      var s0 = LIQ * (0.8 - i * 0.32), ph = cup.ph + i * 2.1 + t * 0.5, a1 = Math.sin(ph) * 0.08, a2 = Math.cos(ph * 0.8) * 0.08;
+      c.beginPath(); c.moveTo(-0.5 * w, -(s0 + a1) * w);
+      c.bezierCurveTo(-0.15 * w, -(s0 + 0.16 + a2 + L.tilt * 0.1) * w, 0.12 * w, -(s0 - 0.17 - a1) * w, 0.5 * w, -(s0 + a2) * w);
+      c.stroke();
+    }
+    c.globalAlpha = a0;
+  }
+  if (cup.crumbs.length) {                                     // крошка Oreo: часть плавает сверху
+    c.fillStyle = C.oreo; c.beginPath();
+    for (i = 0; i < cup.crumbs.length; i++) {
+      p = cup.crumbs[i];
+      var px = p.x + lean * (p.fl ? 1.5 : 1), py = p.fl ? surfAt(px) - 0.014 : p.y + Math.sin(t * 1.1 + p.ph) * 0.012;
+      c.moveTo(px * w + p.r * w, -py * w); c.arc(px * w, -py * w, p.r * w, 0, 6.2832);
+    }
+    c.fill();
+  }
+  for (i = 0; i < cup.cubes.length; i++) {                     // кубики желе
+    p = cup.cubes[i];
+    var cyy = Math.min(p.y + Math.sin(t * 1.3 + p.ph) * 0.014, surfAt(p.x) - p.s * 0.7 - (D.foam ? FOAM_T : 0)), s = p.s * w;
+    c.save(); c.translate((p.x + lean) * w, -cyy * w); c.rotate(p.rot + Math.sin(t * 0.7 + p.ph) * 0.12 + L.tilt * 0.5);
+    c.globalAlpha = a0 * 0.84; c.fillStyle = p.peach ? C.peachJelly : C.cocoJelly; rr(c, -s / 2, -s / 2, s, s, s * 0.22); c.fill();
+    c.globalAlpha = a0 * 0.6; c.strokeStyle = '#fff'; c.lineWidth = Math.max(0.6, w * 0.012); c.stroke();
+    c.fillStyle = '#fff'; c.fillRect(-s * 0.3, -s * 0.3, s * 0.2, s * 0.2);
+    c.restore();
+  }
+  for (i = 0; i < cup.lemons.length; i++) {                    // дольки лимона
+    p = cup.lemons[i];
+    var lx = (p.x + lean) * w, ly = -Math.min(p.y + Math.sin(t * 1.2 + p.ph) * 0.012, surfAt(p.x) - p.r * 0.6) * w, lr = p.r * w, rot = p.rot + Math.sin(t * 0.5 + p.ph) * 0.2;
+    c.fillStyle = C.lemonRind; c.beginPath(); c.arc(lx, ly, lr, 0, 6.2832); c.fill();
+    c.fillStyle = C.lemon; c.beginPath(); c.arc(lx, ly, lr * 0.8, 0, 6.2832); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = Math.max(0.6, w * 0.012); c.beginPath();
+    for (k = 0; k < 3; k++) {
+      var an = rot + k * 1.0472;
+      c.moveTo(lx - Math.cos(an) * lr * 0.72, ly - Math.sin(an) * lr * 0.72); c.lineTo(lx + Math.cos(an) * lr * 0.72, ly + Math.sin(an) * lr * 0.72);
+    }
+    c.stroke();
+  }
+  for (i = 0; i < cup.balls.length; i++) {                     // тапиока и красная фасоль
+    p = cup.balls[i];
+    var bx = p.x * w, by = -p.y * w, br = p.r * w;
+    if (p.bean) {
+      c.fillStyle = C.bean; c.beginPath(); c.ellipse(bx, by, br * 1.25, br * 0.85, p.a, 0, 6.2832); c.fill();
+      c.fillStyle = C.beanHi; c.beginPath(); c.arc(bx - br * 0.35, by - br * 0.25, br * 0.28, 0, 6.2832); c.fill();
+    } else {
+      c.fillStyle = C.tapioca; c.beginPath(); c.arc(bx, by, br, 0, 6.2832); c.fill();
+      c.fillStyle = C.tapiocaHi; c.beginPath(); c.arc(bx - br * 0.32, by - br * 0.34, br * 0.3, 0, 6.2832); c.fill();
+    }
+  }
+  if (cup.bub.length) {                                        // пузырьки
+    c.fillStyle = 'rgba(255,255,255,.22)'; c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = Math.max(0.6, w * 0.01);
+    for (i = 0; i < cup.bub.length; i++) { p = cup.bub[i]; c.beginPath(); c.arc(p.x * w, -p.y * w, p.r * w, 0, 6.2832); c.fill(); c.stroke(); }
+  }
+  if (D.foam) {                                                // шапка сырной пенки
+    for (i = 0; i < n; i++) YS2[i] = YS[i] - FOAM_T - 0.018 * Math.sin(i * 1.9 + cup.ph + t * 0.9) - Math.abs(L.h[i]) * 0.3;
+    c.beginPath(); c.moveTo(-0.5 * w, -YS[0] * w); surfCurve(c, w, YS, false); surfCurve(c, w, YS2, true); c.closePath();
+    c.fillStyle = C.foam; c.fill();
+    c.beginPath(); c.moveTo(0.5 * w, -YS2[n - 1] * w); surfCurve(c, w, YS2, true);
+    c.strokeStyle = C.foamShade; c.lineWidth = Math.max(0.8, w * 0.022); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath();
+    for (i = 0; i < 5; i++) {
+      var fx = -0.32 + i * 0.16 + Math.sin(cup.ph + i) * 0.03, fy = surfAt(fx) - FOAM_T * (0.3 + 0.4 * ((i * 7) % 3) / 2);
+      c.moveTo(fx * w + 0.016 * w, -fy * w); c.arc(fx * w, -fy * w, (0.011 + (i % 2) * 0.006) * w, 0, 6.2832);
+    }
+    c.fill();
+  }
+  c.beginPath(); c.moveTo(-0.5 * w, -YS[0] * w); surfCurve(c, w, YS, false);            // мениск
+  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = Math.max(0.8, w * 0.02); c.stroke();
+  c.restore();
+}
+/* Широкая красная трубочка: часть в стакане видна сквозь напиток, часть над плёнкой — поверх неё. */
+function paintStraw(c, w, above) {
+  var yCut = -(CH - LID_H * 0.45) * w;
+  c.save(); c.beginPath();
+  if (above) c.rect(-w, -(CH + 0.8) * w, 2 * w, (CH + 0.8) * w + yCut);
+  else { c.rect(-w, yCut, 2 * w, -yCut); c.globalAlpha = c.globalAlpha * 0.5; }
+  c.clip(); c.lineCap = 'round';
+  var x0 = 0.03 * w, y0 = -0.16 * w, x1 = 0.2 * w, y1 = -(CH + 0.5) * w;
+  c.strokeStyle = C.accent; c.lineWidth = w * 0.105; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = w * 0.024; c.beginPath(); c.moveTo(x0 - w * 0.024, y0); c.lineTo(x1 - w * 0.024, y1); c.stroke();
+  c.strokeStyle = 'rgba(120,10,30,.35)'; c.lineWidth = w * 0.02; c.beginPath(); c.moveTo(x0 + w * 0.036, y0); c.lineTo(x1 + w * 0.036, y1); c.stroke();
+  c.restore();
+}
+/* Зима: тёплый пар над горячим напитком — мягкие клубы, считаются от времени, без состояния. */
+function paintSteam(c, w, cup, t) {
+  var gs = glowSprite('#FFFFFF'), n = REDUCED ? 2 : 6, k, a0 = c.globalAlpha;
+  for (k = 0; k < n; k++) {
+    var p = (t * 0.42 + k / n + cup.ph) % 1;
+    var x = (Math.sin(p * 5 + k * 2.1 + cup.ph) * 0.09 + (k - (n - 1) / 2) * 0.07) * w, y = -(CH + 0.08 + p * 0.8) * w, r = (0.13 + 0.2 * p) * w;
+    c.globalAlpha = a0 * 0.85 * Math.sin(Math.PI * p);
+    c.drawImage(gs, x - r, y - r, r * 2, r * 2);
+  }
+  c.globalAlpha = a0;
+}
+/* x, y — середина дна на экране; rot — наклон; steam — рисовать ли пар (зима, горячий, сверху ничего не стоит). */
+function drawCupLive(c, cup, x, y, w, rot, t, alpha, centerPivot, steam) {
+  var back = getLayer('back', w), front = getLayer(frontName(cup.kind), w), sq = cup.sq;
+  c.save();
+  c.globalAlpha = alpha;
+  if (centerPivot) { c.translate(x, y - w * CH / 2); c.rotate(rot); c.translate(0, w * CH / 2); }
+  else { c.translate(x, y); if (rot) c.rotate(rot); }
+  if (sq) c.scale(1 + sq * 0.55, 1 - sq);
+  c.drawImage(back.el, -back.ox * w, -back.oy * w, back.w * w, back.h * w);
+  paintLiquid(c, w, cup, t);
+  if (cup.straw) paintStraw(c, w, false);
+  c.drawImage(front.el, -front.ox * w, -front.oy * w, front.w * w, front.h * w);
+  if (cup.straw) paintStraw(c, w, true);
+  if (cup.glow > 0.02) {                                       // «Ровно!»: стакан на миг вспыхивает
+    c.globalCompositeOperation = 'lighter'; c.globalAlpha = alpha * Math.min(1, cup.glow) * 0.6;
+    c.drawImage(front.el, -front.ox * w, -front.oy * w, front.w * w, front.h * w);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = alpha;
+  }
+  if (steam) paintSteam(c, w, cup, t);
+  c.restore();
+}
+/* Снег за окном: три слоя с параллаксом, положение считается от времени — без состояния и без Math.random в кадре. */
+var SNOW = (function () {
+  var r = mulberry32(1231), out = [], l, i;
+  for (l = 0; l < 3; l++) { out.push([]); for (i = 0; i < 26; i++) out[l].push({ x: r(), y: r(), r: r(), ph: r() * 6.2832 }); }
+  return out;
+})();
+var SNOW_L = [{ r0: 0.8, r1: 0.7, sp: 20, par: 0.12, a: 0.5 }, { r0: 1.4, r1: 0.9, sp: 34, par: 0.22, a: 0.75 }, { r0: 2.3, r1: 1.4, sp: 52, par: 0.34, a: 0.9 }];
+function drawSnow(c, w, h, t, camPx, frac) {
+  var l, i;
+  for (l = 0; l < 3; l++) {
+    var n = Math.ceil(SNOW_COUNT[l] * frac), S = SNOW_L[l], hh = h + 20, ww = w + 40;
+    if (!n) continue;
+    c.fillStyle = 'rgba(255,255,255,' + S.a + ')'; c.beginPath();
+    for (i = 0; i < n; i++) {
+      var p = SNOW[l][i];
+      var yy = (p.y * hh + t * S.sp * (0.8 + p.r * 0.4) + camPx * S.par) % hh - 10;
+      var xx = ((p.x * ww + Math.sin(t * 0.6 + p.ph) * (8 + l * 6) + t * 4 * (l + 1)) % ww + ww) % ww - 20;
+      var rad = S.r0 + p.r * S.r1;
+      c.moveTo(xx + rad, yy); c.arc(xx, yy, rad, 0, 6.2832);
+    }
+    c.fill();
+  }
+}
+
+/* ===== Экраны ===== */
+var app = $('app'), stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
+var pop = $('pop'), popTimer = 0, toastTimer = 0, stampTimer = 0, againTimer = 0;
+var screen = 'start', lastGame = null;
+if (WINTER) app.classList.add('winter');
+
+function show(name) {
+  var all = ['start', 'game', 'result', 'limit'];
+  for (var i = 0; i < all.length; i++) {
+    var el = $('s-' + all[i]);
+    if (all[i] === name) { el.classList.remove('is-leaving'); el.classList.add('is-on'); }
+    else if (el.classList.contains('is-on')) {
+      el.classList.remove('is-on');
+      if (!REDUCED) {                                 // уходящий экран плавно гаснет поверх нового
+        el.classList.add('is-leaving');
+        (function (e) { setTimeout(function () { e.classList.remove('is-leaving'); }, 240); })(el);
+      }
+    }
+  }
+  app.classList.toggle('is-game', name === 'game');
+  if (name !== 'result') { app.classList.remove('prize'); fxStop(); }
+  screen = name;
+  if (name !== 'result' && stampTimer) { clearInterval(stampTimer); stampTimer = 0; }
+}
+function toast(text) {
+  var el = $('toast'); el.textContent = text; el.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('on'); }, 1800);
+}
+/* Цифры «набегают» */
+var tweens = [];
+function countTo(el, to, ms) {
+  if (REDUCED || to <= 0) { el.textContent = to; return; }
+  el.textContent = 0; tweens.push({ el: el, to: to, t: 0, d: ms / 1000 });
+}
+function stepTweens(dt) {
+  for (var i = tweens.length - 1; i >= 0; i--) {
+    var tw = tweens[i]; tw.t += dt;
+    var p = Math.min(1, tw.t / tw.d);
+    tw.el.textContent = Math.round(tw.to * (1 - Math.pow(1 - p, 3)));
+    if (p >= 1) tweens.splice(i, 1);
+  }
+}
+function renderProfile(sfx, now) {
+  var v = profileView(now), today = now.getDay(), box = $('dots' + sfx), order = [1, 2, 3, 4, 5, 6, 0];
+  $('streak' + sfx).textContent = v.streak + ' ' + plural(v.streak, 'день', 'дня', 'дней');
+  $('coll' + sfx).textContent = v.count + ' из 7';
+  box.textContent = '';
+  for (var i = 0; i < order.length; i++) {
+    var d = order[i], el = document.createElement('div'), ring = document.createElement('span'), cup = document.createElement('span');
+    el.className = 'cd' + (v.got[d] ? ' on' : '') + (d === today ? ' today' : '');
+    el.title = MENU[DAYS[d].kind];
+    ring.className = 'ring'; cup.className = 'cup';
+    ring.appendChild(cup); el.appendChild(ring); el.appendChild(document.createTextNode(DOW_SHORT[d]));
+    box.appendChild(el);
+  }
+}
+
+/* Герой стартового экрана: напиток дня с трубочкой стоит на втором стакане, жидкость живая. */
+var HV = { cups: null, kind: null, t: 0, next: 1.4, c: null, w: 0, h: 0 };
+function sizeHero() { var f = fitCanvas($('hero')); f.c._tag = 'h'; HV.c = f.c; HV.w = f.w; HV.h = f.h; }
+function setupHero(kind) {
+  if (HV.kind !== kind || !HV.cups) { HV.kind = kind; HV.cups = [makeCup(baseKind(kind), false, 0.07), makeCup(kind, true, 0)]; }
+  sizeHero();
+}
+function heroFrame(dt) {
+  var c = HV.c, w = HV.w, h = HV.h, i;
+  if (!c || !HV.cups) return;
+  if (w < 8 || h < 8) { sizeHero(); return; }
+  HV.t += dt;
+  var t = HV.t, u = Math.min(w * 0.72, (h - 6) / (CH + 0.58 + 0.36)), ax = Math.sin(t * 1.7) * 1.1;
+  for (i = 0; i < 2; i++) stepCup(HV.cups[i], dt, ax * (0.5 + i * 0.5));
+  if (t > HV.next) { HV.next = t + 2.6 + vrand() * 1.8; HV.cups[1].vsq += 0.7; splashCup(HV.cups[1], 0.9, vrand() < 0.5 ? -0.5 : 0.5); }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+  if (WINTER) drawSnow(c, w, h, t, 0, 0.4);
+  var y1 = 6 + (0.58 + CH) * u, sway = Math.sin(t * 1.7) * 0.012;
+  drawCupLive(c, HV.cups[0], w / 2 + HV.cups[0].x * u, y1 + CH * u, u, 0, t, 1, false, false);
+  drawCupLive(c, HV.cups[1], w / 2 + sway * u, y1, u, sway * 0.6, t, 1, false, WINTER && !!HOT[HV.kind]);
+}
+
+function showStart() {
+  var now = new Date(), st = gameState(now);
+  if (attemptsLeft(st) <= 0) { showLimit(); return; }
+  var di = dayInfo(now), line = $('dayline');
+  line.textContent = '';
+  var a = document.createElement('span'); a.className = 'lbl'; a.textContent = 'Напиток дня:';
+  var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = di.name;
+  var b = document.createElement('span'); b.className = 'stars'; b.textContent = starsStr(di.stars);
+  line.appendChild(a); line.appendChild(nm); line.appendChild(document.createTextNode('сложность '));
+  line.appendChild(b);
+  renderProfile('', now);
+  var left = attemptsLeft(st), parts = [];
+  if (left !== Infinity) parts.push('Попыток сегодня: <b>' + left + ' из ' + ATTEMPTS_PER_DAY + '</b>');
+  if (st.best > 0) parts.push('Рекорд дня: <b>' + st.best + '</b>');
+  $('start-meta').innerHTML = parts.join(' · ');
+  $('proto').hidden = !IS_PROTOTYPE;
+  show('start');
+  setupHero(di.kind);
+}
+function showLimit() {
+  var now = new Date(), st = gameState(now);
+  $('limit-record').textContent = st.best > 0 ? 'Рекорд дня: ' + st.best + ' из ' + MAX_SCORE : '';
+  renderProfile('2', now);
+  show('limit');
+}
+function tickStamp() {
+  var d = new Date();
+  $('stamp').textContent = pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear() +
+    ' · ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+}
+
+/* Башня на экране результата: крупно, камера плавно проезжает снизу вверх; слева — вся башня целиком в миниатюре. */
+var RV = null;
+function sizeResult() { if (!RV) return; var f = fitCanvas($('res-tower')); f.c._tag = 'r'; RV.c = f.c; RV.w = f.w; RV.h = f.h; }
+function setupResult(g) { RV = { cups: g.cups, t: 0, camX: g.cups[0].x, c: null, w: 0, h: 0 }; sizeResult(); }
+function resultFrame(dt) {
+  var R = RV, c = R.c, w = R.w, h = R.h, n = R.cups.length, i;
+  if (!c) return;
+  if (w < 8 || h < 8) { sizeResult(); return; }
+  R.t += dt;
+  var t = R.t, mini = 18, u = Math.min((w - mini) * 0.62, 92), cb = Math.max(14, Math.round(u * 0.3));
+  var viewH = h / u, yMin = -cb / u, yMax = n * CH + (R.cups[n - 1].straw ? 0.64 : 0.16);
+  var span = yMax - yMin - viewH, vb = yMin;
+  if (span > 0) {
+    var p = clamp((t - 0.6) / (span * 0.36), 0, 1);
+    vb = yMin + span * (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
+  }
+  var fi = clamp((vb + viewH * 0.5) / CH - 0.5, 0, n - 1), i0 = Math.floor(fi), i1 = Math.min(n - 1, i0 + 1);
+  var tx = R.cups[i0].x + (R.cups[i1].x - R.cups[i0].x) * (fi - i0);
+  R.camX += (tx - R.camX) * (1 - Math.exp(-dt * 4));
+  var ox = mini + (w - mini) / 2;
+  function sx(wx) { return ox + (wx - R.camX) * u; }
+  function sy(wy) { return h - (wy - vb) * u; }
+  for (i = 0; i < n; i++) stepCup(R.cups[i], dt, Math.sin(t * 1.6 + i * 0.7) * 0.45);
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+  if (WINTER) drawSnow(c, w, h, t, vb * u, 0.45);
+  var cy = sy(0);
+  if (cy < h + 8) {                                            // стойка
+    c.fillStyle = C.wood; c.fillRect(0, cy - 4, w, 8);
+    c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(0, cy - 4, w, 1.5);
+    c.fillStyle = C.woodDark; c.fillRect(0, cy + 4, w, 4);
+    c.fillStyle = C.brandDark; c.fillRect(0, cy + 8, w, h - cy);
+  }
+  for (i = 0; i < n; i++) {
+    var yy = sy(i * CH);
+    if (yy - CH * u * 1.6 > h || yy < -u * 0.2) continue;
+    drawCupLive(c, R.cups[i], sx(R.cups[i].x), yy, u, 0, t, 1, false, WINTER && i === n - 1 && !!HOT[R.cups[i].kind]);
+  }
+  /* миниатюра: вся башня столбиком, цвет — как поставлен стакан; рамка — что сейчас в кадре */
+  var mh = h - 20, sl = mh / (n + 0.4), mx = 9;
+  c.fillStyle = WINTER ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.62)'; rr(c, 2, 4, 14, h - 8, 7); c.fill();
+  for (i = 0; i < n; i++) {
+    var q = R.cups[i].pts;
+    c.fillStyle = q < 0 ? (WINTER ? '#BFEFEC' : C.brandDark) : q >= PTS_PER_CUP ? C.sunDeep : q >= NEAR_PTS ? C.brand : '#9DB5B2';
+    rr(c, mx - 3.5 + clamp((R.cups[i].x - R.cups[0].x) * 2.2, -2.5, 2.5), h - 10 - (i + 1) * sl + 1.5, 7, Math.max(2, sl - 2.5), 2); c.fill();
+  }
+  var wy1 = h - 10 - clamp((vb + viewH) / CH, 0, n + 0.3) * sl, wy0 = h - 10 - clamp(vb / CH, 0, n) * sl;
+  c.strokeStyle = WINTER ? '#FFFFFF' : C.brandDark; c.lineWidth = 1.5; rr(c, 2.75, wy1, 12.5, Math.max(6, wy0 - wy1), 4); c.stroke();
+}
+
+/* Салют на призовом экране: конфетти в фирменных цветах, зимой — ещё и снежинки. Свой слой поверх экрана. */
+var FX = { c: null, w: 0, h: 0, p: [], on: false };
+function fxSize() {
+  var el = $('fx'), w = app.clientWidth | 0, h = app.clientHeight | 0, d = Math.min(2, window.devicePixelRatio || 1);
+  el.width = Math.round(w * d); el.height = Math.round(h * d);
+  FX.c = el.getContext('2d'); FX.c.setTransform(d, 0, 0, d, 0, 0); FX.w = w; FX.h = h;
+}
+function fxStop() { if (FX.c) FX.c.clearRect(0, 0, FX.w, FX.h); FX.p.length = 0; FX.on = false; }
+function salute() {
+  fxSize();
+  var cols = [C.brand, C.brandLight, C.accent, C.sun, '#FFFFFF'], i;
+  FX.p.length = 0;
+  for (i = 0; i < FX_MAX; i++) {
+    var left = i % 2 === 0, flake = WINTER && i % 3 === 0;
+    FX.p.push({
+      x: left ? -8 : FX.w + 8, y: FX.h * (0.5 + vrand() * 0.35), vx: (left ? 1 : -1) * (90 + vrand() * 360), vy: -(380 + vrand() * 520),
+      r: flake ? 5 + vrand() * 5 : 4 + vrand() * 4, rot: vrand() * 6.2832, vr: (vrand() - 0.5) * 10,
+      col: flake ? '#FFFFFF' : cols[i % cols.length], flake: flake, life: 2.8 + vrand() * 1.8, t: -vrand() * 0.6
+    });
+  }
+  FX.on = true;
+}
+function fxFrame(dt) {
+  if (!FX.on) return;
+  var c = FX.c, i, k, alive = 0;
+  c.clearRect(0, 0, FX.w, FX.h);
+  for (i = 0; i < FX.p.length; i++) {
+    var p = FX.p[i]; p.t += dt;
+    if (p.t < 0) { alive++; continue; }
+    if (p.t > p.life || p.y > FX.h + 20) continue;
+    alive++;
+    var vmax = p.flake ? 70 : 150;
+    p.vy = Math.min(vmax, p.vy + 640 * dt); p.vx *= Math.exp(-1.3 * dt);
+    p.x += (p.vx + Math.sin(p.t * 3 + p.rot) * 24) * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+    c.save(); c.globalAlpha = clamp((p.life - p.t) / 0.6, 0, 1); c.translate(p.x, p.y); c.rotate(p.rot);
+    if (p.flake) {
+      c.strokeStyle = '#FFFFFF'; c.lineWidth = 1.6; c.lineCap = 'round'; c.beginPath();
+      for (k = 0; k < 3; k++) { var a = k * 1.0472; c.moveTo(-Math.cos(a) * p.r, -Math.sin(a) * p.r); c.lineTo(Math.cos(a) * p.r, Math.sin(a) * p.r); }
+      c.stroke();
+    } else {
+      c.fillStyle = p.col; c.fillRect(-p.r, -p.r * 0.55 * Math.cos(p.t * 9 + p.rot), p.r * 2, p.r * 1.1 * Math.cos(p.t * 9 + p.rot));
+    }
+    c.restore();
+  }
+  if (!alive) fxStop();
+}
+
+function showResult(g, st) {
+  var s = g.score, need = PRIZE_TOPPING - s, title, i;
+  var win = s >= PRIZE_TOPPING, drink = s >= PRIZE_DRINK;
+  if (drink) title = 'Напиток в подарок';
+  else if (win) title = 'Топпинг в подарок';
+  else if (need > 100) title = 'Попробуй ещё: рука привыкнет';
+  else title = 'Почти. До топпинга не хватило ' + need;
+  $('s-result').classList.toggle('win', win);
+  $('res-title').textContent = title;
+  var n = { perfect: 0, near: 0, ok: 0, fall: 0 };
+  for (i = 0; i < g.results.length; i++) {
+    var p = g.results[i].pts;
+    if (p >= PTS_PER_CUP) n.perfect++; else if (p >= NEAR_PTS) n.near++; else if (p > 0) n.ok++; else n.fall++;
+  }
+  $('st-perfect').textContent = n.perfect; $('st-near').textContent = n.near;
+  $('st-ok').textContent = n.ok; $('st-fall').textContent = n.fall;
+  var dayBox = $('st-day'), nm = document.createElement('b');
+  dayBox.textContent = ''; nm.textContent = g.info.name; dayBox.appendChild(nm);
+  dayBox.appendChild(document.createTextNode(profileView(new Date()).got[g.dow] ? 'в коллекции' : 'для коллекции нужно ' + COLLECT_AT));
+  /* призовой талон (v3): слово дня — по дню недели попытки */
+  $('ticket').hidden = !win;
+  $('ticket-main').textContent = drink ? 'К любой покупке' : 'К любому напитку';
+  $('ticket-word').textContent = (drink ? WORDS_DRINK : WORDS_TOPPING)[g.dow];
+  $('ticket-word').setAttribute('data-wk', drink ? 'drink' : 'topping'); $('ticket-word').setAttribute('data-dow', String(g.dow));
+  $('ticket-tag').hidden = !IS_PROTOTYPE;
+  if (stampTimer) { clearInterval(stampTimer); stampTimer = 0; }
+  if (win) { tickStamp(); stampTimer = setInterval(tickStamp, 250); buzz([30, 40, 30, 40, 70]); }
+  var left = attemptsLeft(st), btn = $('btn-again');
+  btn.hidden = left <= 0;
+  btn.disabled = true;                          // чтобы не начать новую попытку случайным тапом
+  clearTimeout(againTimer); againTimer = setTimeout(function () { btn.disabled = false; }, 900);
+  $('res-left').textContent = left <= 0 ? 'На сегодня всё. Завтра новый напиток'
+    : left === Infinity ? ''
+    : (left === 1 ? 'Осталась ' : 'Осталось ') + left + ' ' + plural(left, 'попытка', 'попытки', 'попыток') + ' на сегодня';
+  lastGame = g;
+  show('result');
+  app.classList.toggle('prize', win);           // зимой гирлянда загорается ярче
+  $('s-result').scrollTop = 0;
+  countTo($('res-score'), s, 900);
+  setupResult(g);
+  if (win) salute();
+}
+
+/* ===== Игра ===== */
+var G = null, raf = 0, lastNow = 0;
+var W = 0, H = 0, cw = 60, baseY = 0, counterH = 46, topRoomPx = 0, activePointer = null;
+var par = { x: 0, tx: 0 };          // параллакс от движения пальца или мыши
+var YB = [];                        // высоты доньев стаканов с учётом пружинного сжатия
+var parts = [];                     // частицы: капли, искры, снежная пыль (координаты — в ширинах)
+var BG = { far: null, farW: 0, farH: 0, pad: 30, k: 0.28, counter: null, cPad: 0, cTop: 0, cW: 0, cH: 0, bulbs: [], maxCam: 1 };
+
+function emit(type, x, y, vx, vy, r, life, col) {
+  if (parts.length >= MAX_PARTICLES) parts.shift();
+  parts.push({ type: type, x: x, y: y, vx: vx, vy: vy, r: r, life: life, max: life, col: col });
+}
+function stepParticles(dt) {
+  for (var i = parts.length - 1; i >= 0; i--) {
+    var p = parts[i];
+    p.life -= dt;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    if (p.type === 'dust') { p.vy -= 1.6 * dt; p.vx *= Math.exp(-2.5 * dt); p.vy *= Math.exp(-2.5 * dt); p.x += Math.sin(p.life * 6 + p.r * 90) * 0.1 * dt; }
+    else p.vy -= (p.type === 'drop' ? 14 : 6) * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+/* ----- Задник: уголок точки WeDrink. Тяжёлое рисуется один раз на отдельный canvas. ----- */
+function paintFarDay(c, bw, bh, A, X0, Y0, W0) {
+  var i, x, y, g, k;
+  g = c.createLinearGradient(0, 0, 0, bh);
+  g.addColorStop(0, '#F8F4E3'); g.addColorStop(0.5, '#E6F2EC'); g.addColorStop(1, '#CDE8E4');
+  c.fillStyle = g; c.fillRect(0, 0, bw, bh);
+  c.fillStyle = 'rgba(27,143,142,.06)';                         // узор: шарики тапиоки
+  for (y = 20, i = 0; y < bh; y += 44, i++) for (x = (i % 2) * 26 + 8; x < bw; x += 52) { c.beginPath(); c.arc(x, y, 4 + ((i * 7 + x) % 3), 0, 6.2832); c.fill(); }
+  var py = Y0 - A * 0.36;                                       // панель нижней части стены
+  c.fillStyle = 'rgba(27,143,142,.13)'; c.fillRect(0, py, bw, bh - py);
+  c.fillStyle = 'rgba(255,255,255,.75)'; c.fillRect(0, py - 3, bw, 3);
+  c.fillStyle = 'rgba(21,111,110,.14)'; c.fillRect(0, py, bw, 2);
+  c.fillStyle = 'rgba(255,255,255,.17)'; for (x = 6; x < bw; x += 22) c.fillRect(x, py + 6, 2, bh - py);
+  /* доска меню — слева */
+  var bx = X0 + W0 * 0.04, bwd = W0 * 0.36, bhh = A * 0.3, by = Y0 - A * 0.84, fs = Math.max(9, Math.min(15, bwd * 0.15));
+  c.fillStyle = 'rgba(21,60,60,.16)'; rr(c, bx + 3, by + 5, bwd, bhh, 10); c.fill();
+  c.fillStyle = C.brandDark; rr(c, bx, by, bwd, bhh, 10); c.fill();
+  c.strokeStyle = C.wood; c.lineWidth = 3; c.stroke();
+  c.fillStyle = '#fff'; c.font = '900 ' + fs + 'px ' + FONT; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+  c.fillText('МЕНЮ', bx + 10, by + 8 + fs);
+  var rows = [C.milkBot, C.grapeBot, C.strawBot, C.chocoBot], rh = (bhh - fs - 22) / rows.length;
+  for (i = 0; i < rows.length; i++) {
+    var ry = by + fs + 16 + rh * (i + 0.5);
+    c.fillStyle = rows[i]; c.beginPath(); c.arc(bx + 15, ry, Math.min(5, rh * 0.32), 0, 6.2832); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(bx + 26, ry - 2.5, bwd * (0.38 + (i % 2) * 0.12), 2.5);
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 26, ry + 2.5, bwd * 0.26, 2);
+  }
+  /* круглая вывеска — справа */
+  var sx0 = X0 + W0 * 0.8, sy0 = Y0 - A * 0.7, sr = Math.min(W0 * 0.14, 50);
+  c.fillStyle = 'rgba(21,60,60,.16)'; c.beginPath(); c.arc(sx0 + 2, sy0 + 5, sr, 0, 6.2832); c.fill();
+  g = c.createLinearGradient(0, sy0 - sr, 0, sy0 + sr); g.addColorStop(0, C.brandLight); g.addColorStop(1, C.brand);
+  c.fillStyle = g; c.beginPath(); c.arc(sx0, sy0, sr, 0, 6.2832); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(sx0, sy0, sr - 5, 0, 6.2832); c.stroke();
+  c.fillStyle = '#fff'; c.font = '900 ' + (sr * 0.38) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('WeDrink', sx0, sy0 + 1);
+  /* полка с банками: тапиока, чай, кокосовое желе */
+  var shY = Y0 - A * 0.4, shX = X0 + W0 * 0.63, shW = W0 * 0.35, jw = shW * 0.24, jh = A * 0.1;
+  var jars = [C.tapioca, C.teaBot, C.cocoJelly];
+  for (i = 0; i < 3; i++) {
+    var jx = shX + shW * (0.08 + i * 0.31);
+    c.fillStyle = 'rgba(255,255,255,.6)'; rr(c, jx, shY - jh, jw, jh, 4); c.fill();
+    c.fillStyle = jars[i]; c.globalAlpha = 0.85; rr(c, jx + 1.5, shY - jh * 0.68, jw - 3, jh * 0.68 - 1.5, 3); c.fill(); c.globalAlpha = 1;
+    c.strokeStyle = 'rgba(21,111,110,.45)'; c.lineWidth = 1.2; rr(c, jx, shY - jh, jw, jh, 4); c.stroke();
+    c.fillStyle = C.brand; rr(c, jx - 1, shY - jh - 4, jw + 2, 5, 2); c.fill();
+  }
+  c.fillStyle = 'rgba(21,60,60,.14)'; c.fillRect(shX + 2, shY + 5, shW, 3);
+  c.fillStyle = C.wood; c.fillRect(shX, shY, shW, 5); c.fillStyle = C.woodDark; c.fillRect(shX, shY + 4, shW, 1.5);
+  /* выше — бирюзовый фриз и плакаты: их видно, когда башня подрастёт */
+  var fy = bh - H - 80;
+  if (fy > 12) {
+    c.fillStyle = C.brand; c.fillRect(0, fy, bw, 34);
+    c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(0, fy, bw, 2); c.fillRect(0, fy + 32, bw, 2);
+    c.fillStyle = 'rgba(255,255,255,.95)'; c.font = '900 14px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('WeDrink  ·  Настоящий азиатский чай  ·  WeDrink', bw / 2, fy + 18);
+  }
+  var posters = [[0.07, 205, C.strawBot, C.foam], [0.66, 262, C.grapeBot, C.lemon], [0.1, 345, C.milkBot, C.tapioca]];
+  for (i = 0; i < posters.length; i++) {
+    var P0 = posters[i], pyy = bh - H - P0[1], pxx = X0 + W0 * P0[0], pw = W0 * 0.26, ph = pw * 1.25;
+    if (pyy < 8) continue;
+    c.fillStyle = 'rgba(21,60,60,.14)'; rr(c, pxx + 2, pyy + 4, pw, ph, 6); c.fill();
+    c.fillStyle = '#FFFDF6'; rr(c, pxx, pyy, pw, ph, 6); c.fill(); c.strokeStyle = C.wood; c.lineWidth = 2.5; c.stroke();
+    var ccx = pxx + pw / 2, ccy = pyy + ph * 0.8, cs = pw * 0.36;
+    c.fillStyle = P0[2]; c.beginPath(); c.moveTo(ccx - cs * 0.46, ccy - cs * 1.3); c.lineTo(ccx + cs * 0.46, ccy - cs * 1.3); c.lineTo(ccx + cs * 0.33, ccy); c.lineTo(ccx - cs * 0.33, ccy); c.closePath(); c.fill();
+    c.fillStyle = P0[3]; for (k = 0; k < 3; k++) { c.beginPath(); c.arc(ccx + (k - 1) * cs * 0.2, ccy - cs * 0.14, cs * 0.09, 0, 6.2832); c.fill(); }
+    c.fillStyle = C.brand; c.fillRect(ccx - cs * 0.5, ccy - cs * 1.42, cs, cs * 0.13);
+    c.strokeStyle = C.accent; c.lineWidth = cs * 0.1; c.lineCap = 'round'; c.beginPath(); c.moveTo(ccx + cs * 0.05, ccy - cs * 1.2); c.lineTo(ccx + cs * 0.22, ccy - cs * 1.85); c.stroke();
+  }
+}
+/* Зима: вечерняя точка. За стеклянной витриной — улица, дома с тёплыми окнами, размытые огни; внутри — гирлянды, чем выше, тем гуще. */
+function paintFarWinter(c, bw, bh, A, X0, Y0, W0) {
+  var r = mulberry32(1215), i, x, y, g, wy, wx;
+  g = c.createLinearGradient(0, 0, 0, bh);
+  g.addColorStop(0, '#0A1E40'); g.addColorStop(0.55, '#0E3F5C'); g.addColorStop(1, '#10565C');
+  c.fillStyle = g; c.fillRect(0, 0, bw, bh);
+  c.fillStyle = '#FFFFFF';
+  for (i = 0; i < 46; i++) { x = r() * bw; y = r() * Math.max(40, bh - H * 0.55); c.globalAlpha = 0.25 + r() * 0.6; c.beginPath(); c.arc(x, y, 0.5 + r() * 0.9, 0, 6.2832); c.fill(); }
+  c.globalAlpha = 1;
+  for (x = -10; x < bw;) {                                      // дома через дорогу
+    var bwd = 34 + r() * 44, bhg = A * (0.22 + r() * 0.42);
+    c.fillStyle = 'rgba(6,22,44,' + (0.55 + r() * 0.25).toFixed(2) + ')'; c.fillRect(x, Y0 - bhg, bwd, bhg + 4);
+    for (wy = Y0 - bhg + 9; wy < Y0 - 10; wy += 15) for (wx = x + 6; wx < x + bwd - 8; wx += 12) {
+      if (r() < 0.42) { c.fillStyle = r() < 0.75 ? 'rgba(255,214,130,.85)' : 'rgba(140,237,232,.7)'; c.fillRect(wx, wy, 5, 7); }
+    }
+    x += bwd + 3 + r() * 10;
+  }
+  var cols = [C.lamp, C.brandLight, '#FF8496', '#FFFFFF'];
+  for (i = 0; i < 24; i++) {                                    // размытые огни улицы
+    x = r() * bw; y = Y0 - r() * A * 0.8; var rad = 8 + r() * 22, col = cols[i % 4];
+    g = c.createRadialGradient(x, y, 0, x, y, rad); g.addColorStop(0, rgba(col, 0.42)); g.addColorStop(1, rgba(col, 0));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, rad, 0, 6.2832); c.fill();
+  }
+  g = c.createLinearGradient(0, Y0 - A * 0.55, 0, Y0);          // тёплый свет точки на стекле
+  g.addColorStop(0, 'rgba(255,214,130,0)'); g.addColorStop(1, 'rgba(255,214,130,.22)');
+  c.fillStyle = g; c.fillRect(0, Y0 - A * 0.55, bw, A * 0.55);
+  g = c.createLinearGradient(0, Y0, 0, bh);                     // стена под окном
+  g.addColorStop(0, '#0D4C54'); g.addColorStop(1, '#093A44');
+  c.fillStyle = g; c.fillRect(0, Y0, bw, bh - Y0);
+  c.fillStyle = 'rgba(255,255,255,.06)'; for (x = 6; x < bw; x += 22) c.fillRect(x, Y0 + 8, 2, bh - Y0);
+  /* светящаяся вывеска на стекле */
+  var sx0 = X0 + W0 * 0.5, sy0 = Y0 - A * 0.72, sr = Math.min(W0 * 0.16, 56);
+  g = c.createRadialGradient(sx0, sy0, sr * 0.4, sx0, sy0, sr * 1.9); g.addColorStop(0, rgba(C.brandLight, 0.42)); g.addColorStop(1, rgba(C.brandLight, 0));
+  c.fillStyle = g; c.beginPath(); c.arc(sx0, sy0, sr * 1.9, 0, 6.2832); c.fill();
+  c.strokeStyle = '#B9FBF7'; c.lineWidth = 2.5; c.beginPath(); c.arc(sx0, sy0, sr, 0, 6.2832); c.stroke();
+  c.strokeStyle = rgba(C.brandLight, 0.5); c.lineWidth = 6; c.beginPath(); c.arc(sx0, sy0, sr, 0, 6.2832); c.stroke();
+  c.fillStyle = '#FFFFFF'; c.font = '900 ' + (sr * 0.4) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.shadowColor = C.brandLight; c.shadowBlur = 12; c.fillText('WeDrink', sx0, sy0 + 1); c.shadowBlur = 0;
+  /* гирлянды */
+  var gcols = [C.sun, '#FF6B7F', C.brandLight, '#FFFFFF'], gy = Y0 - A * 0.92, gap = 92, row = 0, n;
+  BG.bulbs = [];
+  while (gy > 14) {
+    var step = Math.max(15, 27 - row * 2), sag = 16 + (row % 2) * 6, sw = 2 + (row % 2);
+    c.strokeStyle = 'rgba(3,18,30,.85)'; c.lineWidth = 1.2; c.beginPath();
+    for (x = -4; x <= bw + 4; x += 4) { y = gy + sag * Math.abs(Math.sin(Math.PI * sw * x / bw + row)); if (x === -4) c.moveTo(x, y); else c.lineTo(x, y); }
+    c.stroke();
+    for (n = 0, x = step / 2 + (row % 2) * step / 2; x < bw; x += step, n++) {
+      y = gy + sag * Math.abs(Math.sin(Math.PI * sw * x / bw + row)) + 3;
+      var gc = gcols[(n + row) % 4];
+      g = c.createRadialGradient(x, y, 0, x, y, 9); g.addColorStop(0, rgba(gc, 0.6)); g.addColorStop(1, rgba(gc, 0));
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, 9, 0, 6.2832); c.fill();
+      c.fillStyle = gc; c.beginPath(); c.arc(x, y, 2.1, 0, 6.2832); c.fill();
+      if ((n + row) % 3 === 0) BG.bulbs.push({ x: x, y: y, col: gc, ph: r() * 6.2832, f: 1.5 + r() * 2.5 });
+    }
+    gy -= gap; gap = Math.max(40, gap - 12); row++;
+  }
+}
+/* Стойка: столешница, бирюзовая панель с «WeDrink», запасные стаканы и трубочки; зимой — мандарины и огоньки. */
+function paintCounter(c, bw, y0, ch, cPad) {
+  var i, g, x, s = cw * 0.44;
+  var cx = cPad + W * 0.085, cup0 = y0 - 5;                      // стопка пустых стаканов
+  for (i = 3; i >= 0; i--) {
+    var yb = cup0 - i * cw * 0.12;
+    c.beginPath(); c.moveTo(cx - s * 0.5, yb - s * 1.6); c.lineTo(cx + s * 0.5, yb - s * 1.6); c.lineTo(cx + s * 0.36, yb); c.lineTo(cx - s * 0.36, yb); c.closePath();
+    c.fillStyle = WINTER ? 'rgba(210,240,240,.5)' : 'rgba(255,255,255,.72)'; c.fill();
+    c.strokeStyle = WINTER ? 'rgba(214,246,244,.75)' : 'rgba(21,111,110,.55)'; c.lineWidth = 1.2; c.stroke();
+  }
+  var jx = cPad + W * 0.915, jw = cw * 0.36, jh = cw * 0.5;       // стакан с красными трубочками
+  c.lineCap = 'round';
+  for (i = 0; i < 6; i++) {
+    c.strokeStyle = i % 3 === 1 ? '#F0566B' : C.accent; c.lineWidth = Math.max(2, cw * 0.05);
+    c.beginPath(); c.moveTo(jx + (i - 2.5) * jw * 0.1, y0 - 8); c.lineTo(jx + (i - 2.5) * jw * 0.3, y0 - cw * (0.92 + (i % 2) * 0.12)); c.stroke();
+  }
+  c.fillStyle = WINTER ? 'rgba(210,240,240,.42)' : 'rgba(255,255,255,.62)'; rr(c, jx - jw / 2, y0 - 5 - jh, jw, jh, 4); c.fill();
+  c.strokeStyle = WINTER ? 'rgba(214,246,244,.7)' : 'rgba(21,111,110,.5)'; c.lineWidth = 1.2; c.stroke();
+  if (WINTER) {                                                 // мандарины
+    var mr = cw * 0.13, mx = cPad + W * 0.085 + cw * 0.5;
+    for (i = 0; i < 3; i++) {
+      var mxx = mx + (i === 2 ? mr * 1.0 : i * mr * 2.05), myy = y0 - 5 - mr - (i === 2 ? mr * 1.7 : 0);
+      g = c.createRadialGradient(mxx - mr * 0.3, myy - mr * 0.3, mr * 0.1, mxx, myy, mr); g.addColorStop(0, '#FFC062'); g.addColorStop(1, '#F07F1B');
+      c.fillStyle = g; c.beginPath(); c.arc(mxx, myy, mr, 0, 6.2832); c.fill();
+      c.fillStyle = '#2E8B57'; c.beginPath(); c.ellipse(mxx + mr * 0.25, myy - mr * 0.95, mr * 0.34, mr * 0.16, -0.5, 0, 6.2832); c.fill();
+    }
+  }
+  c.fillStyle = C.wood; c.fillRect(0, y0 - 6, bw, 11);            // столешница
+  c.fillStyle = 'rgba(255,255,255,.5)'; c.fillRect(0, y0 - 6, bw, 2);
+  c.fillStyle = C.woodDark; c.fillRect(0, y0 + 5, bw, 7);
+  g = c.createLinearGradient(0, y0 + 12, 0, y0 + ch);
+  g.addColorStop(0, C.brand); g.addColorStop(1, C.brandDark);
+  c.fillStyle = g; c.fillRect(0, y0 + 12, bw, ch - 12);
+  g = c.createLinearGradient(0, y0 + 12, 0, y0 + 28); g.addColorStop(0, 'rgba(0,30,30,.34)'); g.addColorStop(1, 'rgba(0,30,30,0)');
+  c.fillStyle = g; c.fillRect(0, y0 + 12, bw, 16);
+  c.fillStyle = 'rgba(255,255,255,.07)';
+  for (x = 10, i = 0; x < bw; x += 26, i++) { c.beginPath(); c.arc(x, y0 + 12 + (ch - 12) * (i % 2 ? 0.3 : 0.72), 4, 0, 6.2832); c.fill(); }
+  c.fillStyle = 'rgba(255,255,255,.96)'; c.font = '900 ' + Math.round((ch - 12) * 0.5) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('WeDrink', bw / 2, y0 + 12 + (ch - 12) * 0.52);
+  if (WINTER) {                                                 // огоньки по кромке стойки
+    var cols = [C.sun, '#FF6B7F', C.brandLight, '#FFFFFF'];
+    for (x = 12, i = 0; x < bw; x += 24, i++) {
+      g = c.createRadialGradient(x, y0 + 15, 0, x, y0 + 15, 8); g.addColorStop(0, rgba(cols[i % 4], 0.75)); g.addColorStop(1, rgba(cols[i % 4], 0));
+      c.fillStyle = g; c.beginPath(); c.arc(x, y0 + 15, 8, 0, 6.2832); c.fill();
+      c.fillStyle = cols[i % 4]; c.beginPath(); c.arc(x, y0 + 15, 1.8, 0, 6.2832); c.fill();
+    }
+  }
+}
+function buildBackdrop() {
+  var pad = BG.pad, bd = Math.min(dpr, 2), A = H - counterH, el, c;
+  BG.maxCam = Math.max(0.01, (CUPS + 1) * CH - (baseY - topRoomPx) / cw);
+  var extra = Math.ceil(BG.maxCam * cw * BG.k) + 40, bw = W + pad * 2, bh = H + extra;
+  el = document.createElement('canvas'); el.width = Math.round(bw * bd); el.height = Math.round(bh * bd);
+  c = el.getContext('2d'); c.scale(bd, bd);
+  BG.bulbs = [];
+  if (WINTER) paintFarWinter(c, bw, bh, A, pad, bh - counterH, W); else paintFarDay(c, bw, bh, A, pad, bh - counterH, W);
+  BG.far = el; BG.farW = bw; BG.farH = bh;
+  var cPad = Math.ceil(cw * 2.4), cTop = Math.ceil(cw * 1.25), cwd = W + cPad * 2, chh = cTop + counterH + 10;
+  el = document.createElement('canvas'); el.width = Math.round(cwd * bd); el.height = Math.round(chh * bd);
+  c = el.getContext('2d'); c.scale(bd, bd);
+  paintCounter(c, cwd, cTop, counterH + 10, cPad);
+  BG.counter = el; BG.cPad = cPad; BG.cTop = cTop; BG.cW = cwd; BG.cH = chh;
+}
+function resizeStage() {
+  var f = fitCanvas(cv); f.c._tag = 'g';
+  W = f.w; H = f.h;
+  if (W < 10 || H < 10) return;
+  counterH = Math.round(clamp(H * 0.12, 40, 62));
+  cw = Math.min(W / (2 * RANGE + 1.1), (H - counterH - 40) / (GAP + CH + 0.6 + 1.3), 96);
+  cw = Math.max(24, cw);
+  baseY = H - counterH;
+  topRoomPx = (GAP + CH + 0.6) * cw + 44;     // место под летящий стакан с трубочкой и всплывающую оценку
+  buildBackdrop();
+}
+function updateHud() { $('hud-n').textContent = Math.min(G.i + 1, CUPS) + '/' + CUPS; }
+function hidePop() { pop.classList.remove('on'); }
+function showPop(cls, big, small) {
+  pop.className = 'pop ' + cls;
+  $('pop-big').textContent = big; $('pop-small').textContent = small;
+  void pop.offsetWidth;
+  pop.classList.add('on');
+  clearTimeout(popTimer); popTimer = setTimeout(hidePop, 820);
+}
+function bumpScore() { var el = $('chip-score'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+
+function startGame() {
+  if (screen === 'game') return;
+  var now = new Date(), st = gameState(now);
+  if (attemptsLeft(st) <= 0) { showLimit(); return; }
+  st.used += 1;                    // попытка списывается сразу: перезагрузка её не вернёт
+  saveGameState(st);
+  profileOnPlay(now);
+  var di = dayInfo(now), sched = buildSchedule(st.day + '|' + st.used + '|' + SLUG, di.P, di.kind);   // сид: дата + номер попытки
+  G = {
+    day: st.day, dow: di.dow, info: di, P: di.P, attempt: st.used, sched: sched, sph: sched.phase,
+    cups: [makeCup(baseKind(di.kind), false, 0)],                               // первый стакан уже на стойке
+    i: 0, score: 0, shown: 0, shownInt: 0, results: [], accum: 0, amp: swayTarget(di.P, 0), streak: 0,
+    t: 0, phase: 'intro', phaseT: START_S, hover: null, drop: null, fall: null, flash: null,
+    waves: [], flakes: [], shake: 0, fog: 0, cheer: 0, camX: 0, camY: 0
+  };
+  parts.length = 0;
+  G.cups[0].vsq = 1.6; splashCup(G.cups[0], 1, 0);
+  $('hud-score').textContent = '0';
+  $('hint-name').textContent = MENU[G.cups[0].kind]; $('hint-sub').textContent = 'Уже на стойке · ставь стаканы сверху';
+  show('game'); hidePop(); resizeStage(); updateHud();
+}
+function spawnHover() {
+  var s = G.sched[G.i];
+  G.hover = { t0: G.t, v: s.v, p0: s.side > 0 ? 0.25 : 0.75, cup: makeCup(s.kind, s.straw, 0), dir: 0, last: 0, lean: 0 };
+  G.hover.last = hoverOffset(G.hover, G.t);
+  G.phase = 'hover';
+  $('hint-name').textContent = MENU[s.kind];
+  $('hint-sub').textContent = (s.straw ? 'Напиток дня' : 'Летит') + ' · тап, клик или пробел: стакан опускается';
+  updateHud();
+}
+/* Тап: смещение считается в момент тапа — по центру летящего стакана и центру крышки верхнего (с учётом покачивания). */
+function doDrop(tt) {
+  var h = G.hover, level = G.cups.length;
+  var off = hoverOffset(h, tt) - lidSway(G.amp, G.P.swayHz, level, tt, G.sph);
+  G.drop = { t0: tt, off: off, j: judge(off, G.P.tol), cup: h.cup, lean: h.lean };
+  G.hover = null;
+  G.phase = 'drop';
+}
+function tap() {
+  if (!G || G.phase !== 'hover') return;
+  var tt = G.t + clamp((performance.now() - lastNow) / 1000, 0, 0.05);   // точное время тапа, а не начало кадра
+  if (tt - G.hover.t0 < TAP_GUARD_S) return;
+  doDrop(tt);
+}
+function land() {
+  var d = G.drop, j = d.j, level = G.cups.length, top = G.cups[level - 1], cup = d.cup, i;
+  var v = verdict(j.pts), side = d.off < 0 ? -1 : 1;
+  var lidX = top.x + lidSway(G.amp, G.P.swayHz, level, G.t, G.sph), lidY = level * CH;
+  cup.lean = 0; cup.sq = 0;
+  G.results.push({ pts: j.pts, d: j.d });
+  G.score += j.pts;
+  if (j.fall) {
+    var miss = j.d > 1;                                 // мимо башни совсем — летит вниз; задел край — опрокидывается
+    G.fall = { cup: cup, x: lidX + d.off, y: lidY, vx: side * (miss ? 0.35 : 1.5), vy: miss ? -2 * GAP / DROP_S : 1.5,
+      rot: 0, vr: side * (miss ? 1.8 : 6), t0: G.t, spill: 0 };
+    if (!miss) {                                        // башня вздрагивает от удара по краю
+      top.vsq += 0.9; top.vrk += side * 0.5; splashCup(top, 0.9, side);
+      G.waves.push({ t0: G.t, top: level - 1, next: level - 2, k: 0.5, decay: 0.6, floor: 0, glow: 0 });
+      for (i = 0; i < (REDUCED ? 3 : 9); i++) emit('drop', lidX + side * 0.5, lidY + 0.05, side * (0.4 + vrand() * 1.6), 1 + vrand() * 2.2, 0.025 + vrand() * 0.03, 0.7, DRINKS[cup.kind].bot);
+    }
+    G.streak = 0;
+    if (!REDUCED) G.shake = 1;                          // лёгкая тряска камеры на ошибке
+    if (WINTER) G.fog = 1;                              // зимой стекло на миг запотевает
+    G.phase = 'fall'; G.phaseT = G.t + 2.4;
+    showPop('fall', v.text, '0');
+  } else {
+    cup.x = top.x + (j.perfect ? 0 : d.off); cup.pts = j.pts;
+    G.cups.push(cup);
+    cup.vsq += 2.3;                                     // пружинное проседание и отскок
+    splashCup(cup, j.perfect ? 1.5 : 1.25, j.perfect ? 0 : side * Math.min(1, j.d * 3));
+    G.waves.push({ t0: G.t, top: level, next: level - 1, k: j.perfect ? 1 : 0.6, decay: j.perfect ? 0.9 : 0.6, floor: j.perfect ? 0.4 : 0, glow: j.perfect ? 1 : 0 });
+    if (j.perfect) {
+      G.streak += 1; cup.glow = 1; G.cheer = 1;
+      G.flash = { t0: G.t, level: level };
+      var ns = REDUCED ? 5 : (WINTER ? 20 : 14);        // искры; зимой — как от бенгальского огня
+      for (i = 0; i < ns; i++) {
+        var a = Math.PI * (0.05 + 0.9 * vrand()), sp = (WINTER ? 2.2 : 1.6) + vrand() * 2.6;
+        emit('spark', cup.x + (vrand() - 0.5) * 0.8, lidY + 0.02, Math.cos(a) * sp, Math.sin(a) * sp * 0.8 + 0.6, 0.02 + vrand() * 0.025, 0.4 + vrand() * 0.45, vrand() < 0.55 ? C.sun : '#FFFFFF');
+      }
+      buzz(G.streak > 1 ? [14, 24, 14] : 18);
+    } else {
+      G.accum += j.d;                                   // накопленное смещение раскачивает башню
+      cup.vrk += side * j.d * 7;                        // кривая посадка — стакан покачивается
+      G.streak = 0;
+      if (j.pts >= NEAR_PTS) buzz(8);
+    }
+    if (WINTER) {                                       // снежная пыль; несколько снежинок оседают на плёнке и тают
+      for (i = 0; i < (REDUCED ? 3 : 8); i++) emit('dust', cup.x + (vrand() - 0.5) * 1.1, lidY + vrand() * 0.15, (vrand() - 0.5) * 1.6, 0.3 + vrand() * 0.9, 0.012 + vrand() * 0.016, 0.9 + vrand() * 0.7, '#FFFFFF');
+      for (i = 0; i < (REDUCED ? 2 : 5); i++) G.flakes.push({ ci: level, x: (vrand() - 0.5) * 0.8, r: 0.018 + vrand() * 0.02, t0: G.t + 0.15 + vrand() * 0.7, life: 1.6 + vrand() * 1.2 });
+    }
+    G.phase = 'settle'; G.phaseT = G.t + SETTLE_S;
+    showPop(v.cls, j.perfect && G.streak > 1 ? 'Ровно! ×' + G.streak : v.text, '+' + j.pts);
+    bumpScore();
+  }
+  G.drop = null;
+  updateHud();
+}
+function nextCup() {
+  G.fall = null;
+  G.i += 1;
+  if (G.i >= CUPS) {
+    G.phase = 'end'; G.phaseT = G.t + END_S; $('hud-n').textContent = CUPS + '/' + CUPS;
+    $('hint-name').textContent = 'Башня готова'; $('hint-sub').textContent = 'Считаем очки';
+    var top = G.cups[G.cups.length - 1], n = REDUCED ? 4 : 16, i;      // финальный салют над башней
+    G.cheer = 1;
+    for (i = 0; i < n; i++) emit('spark', top.x + (vrand() - 0.5) * 0.6, G.cups.length * CH + 0.3, (vrand() - 0.5) * 4, 1.5 + vrand() * 3, 0.02 + vrand() * 0.025, 0.6 + vrand() * 0.5, [C.sun, '#FFFFFF', C.brandLight][i % 3]);
+  } else spawnHover();
+}
+function finishGame() {
+  var g = G; G = null;
+  var st = gameState(new Date());
+  if (st.day === g.day) { if (g.score > st.best) st.best = g.score; saveGameState(st); }
+  profileOnScore(g.dow, g.score);
+  hidePop();
+  showResult(g, st);
+}
+
+function update(dt) {
+  G.t += dt;
+  var t = G.t, P = G.P, i, s;
+  G.amp += (swayTarget(P, G.accum) - G.amp) * (1 - Math.exp(-dt * 3));
+  var level = G.cups.length, top = G.cups[level - 1], topY = level * CH;
+  var k = 1 - Math.exp(-dt * 3.4);
+  var camT = G.phase === 'end' ? topY + 0.62 - (baseY - 24) / cw : topY - (baseY - topRoomPx) / cw;
+  G.camY += (Math.max(0, camT) - G.camY) * k;                   // камера плавно поднимается вместе с башней
+  G.camX += (top.x - G.camX) * k;
+  par.x += (par.tx - par.x) * (1 - Math.exp(-dt * 4));
+  G.shown += (G.score - G.shown) * (1 - Math.exp(-dt * 10));    // счёт «набегает»
+  var si = REDUCED ? G.score : Math.round(G.shown);
+  if (si !== G.shownInt) { G.shownInt = si; $('hud-score').textContent = si; }
+  if (G.shake > 0) G.shake = G.shake < 0.02 ? 0 : G.shake * Math.exp(-7 * dt);
+  if (G.fog > 0) G.fog = G.fog < 0.01 ? 0 : G.fog * Math.exp(-2.2 * dt);
+  if (G.cheer > 0) G.cheer = G.cheer < 0.01 ? 0 : G.cheer * Math.exp(-1.6 * dt);
+  for (i = G.waves.length - 1; i >= 0; i--) {                   // волна бежит по башне сверху вниз
+    var wv = G.waves[i];
+    while (wv.next >= 0 && t >= wv.t0 + (wv.top - wv.next) * 0.055) {
+      var cc = G.cups[wv.next], dist = wv.top - wv.next, kk = wv.k * Math.max(wv.floor, Math.pow(wv.decay, dist));
+      cc.vsq += 1.5 * kk; splashCup(cc, 0.9 * kk, 0);
+      if (wv.glow) cc.glow = Math.max(cc.glow, wv.glow * Math.max(0.45, Math.pow(0.9, dist)));
+      wv.next--;
+    }
+    if (wv.next < 0) G.waves.splice(i, 1);
+  }
+  var steps = Math.min(4, Math.max(1, Math.ceil(dt / 0.012))), h = dt / steps;
+  var acc = -Math.pow(2 * Math.PI * P.swayHz, 2) * G.amp * Math.sin(2 * Math.PI * (P.swayHz * t + G.sph));
+  for (s = 0; s < steps; s++) {                                 // жидкость плещется от покачивания башни
+    for (i = 0; i < G.cups.length; i++) stepCup(G.cups[i], h, acc * (i + 0.5) / CUPS);
+    if (G.hover) stepCup(G.hover.cup, h, 0);
+    if (G.drop) stepCup(G.drop.cup, h, 0);
+    if (G.fall) stepCup(G.fall.cup, h, 0);
+  }
+  stepParticles(dt);
+  if (G.phase === 'intro') { if (t >= G.phaseT) spawnHover(); }
+  else if (G.phase === 'hover') {
+    var hv = G.hover, off = hoverOffset(hv, t), dir = off >= hv.last ? 1 : -1;
+    if (hv.dir && dir !== hv.dir) {                             // разворот у края: напиток по инерции плещется дальше
+      hv.cup.liq.vt += hv.dir * 2.6;
+      for (i = 0; i < hv.cup.balls.length; i++) hv.cup.balls[i].vx += hv.dir * 0.5;
+    }
+    hv.dir = dir; hv.last = off;
+    hv.lean += (-dir * 0.04 - hv.lean) * (1 - Math.exp(-dt * 8));
+    hv.cup.lean = hv.lean;
+    if (t - hv.t0 >= AUTO_DROP_S) doDrop(hv.t0 + AUTO_DROP_S);
+  }
+  else if (G.phase === 'drop') {
+    var e = clamp((t - G.drop.t0) / DROP_S, 0, 1);
+    G.drop.cup.sq = -0.06 * e * e; G.drop.cup.vsq = 0;          // в падении стакан чуть вытягивается
+    if (t - G.drop.t0 >= DROP_S) land();
+  }
+  else if (G.phase === 'settle') { if (t >= G.phaseT) nextCup(); }
+  else if (G.phase === 'fall') {
+    var f = G.fall;
+    f.vy -= 15 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
+    f.cup.lean = clamp(Math.sin(f.rot), -0.7, 0.7);
+    f.cup.liq.level = Math.max(0.3, f.cup.liq.level - 0.45 * dt);
+    f.spill += dt;
+    while (f.spill > (REDUCED ? 0.12 : 0.035)) {                // напиток проливается каплями
+      f.spill -= REDUCED ? 0.12 : 0.035;
+      var D = DRINKS[f.cup.kind], sn = Math.sin(f.rot), cs = Math.cos(f.rot);
+      emit('drop', f.x + sn * CH * 0.5 + (vrand() - 0.5) * 0.5 * cs, f.y + CH * 0.5 + cs * CH * 0.5, f.vx * 0.6 + sn * 1.6 + (vrand() - 0.5) * 1.2, f.vy * 0.5 + cs * 1.6 + vrand() * 1.2,
+        0.022 + vrand() * 0.035, 0.6 + vrand() * 0.5, vrand() < 0.5 ? D.top : D.bot);
+    }
+    var gone = baseY - (f.y + CH * 1.4 - G.camY) * cw > H;      // улетел за нижний край
+    if ((gone && t - f.t0 > 0.55) || t >= G.phaseT) nextCup();
+  }
+  else if (G.phase === 'end') { if (t >= G.phaseT) finishGame(); }
+}
+
+/* ----- Кадр игры ----- */
+function drawLamps(c, camPx, shx, shy) {
+  var A = H - counterH, lw = cw * 0.72, i, gs = glowSprite(C.lamp);
+  for (i = 0; i < 4; i++) {
+    var u = A * (1.03 + i * 0.42), x = W * (i % 2 ? 0.87 : 0.13) - par.x * 12 - G.camX * cw * 0.3 + shx * 0.6, y = baseY - u + camPx * 0.55 + shy * 0.6;
+    if (y < -lw || y - lw * 1.4 > H) continue;
+    c.strokeStyle = WINTER ? 'rgba(2,14,26,.8)' : 'rgba(31,42,42,.45)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, -4); c.lineTo(x, y - lw * 0.44); c.stroke();
+    if (WINTER && i % 2) {                                      // ёлочный шар
+      var br = lw * 0.3, bc = i === 1 ? C.accent : C.brandLight;
+      c.fillStyle = C.sunDeep; c.fillRect(x - br * 0.22, y - br * 2.3, br * 0.44, br * 0.34);
+      var g = c.createRadialGradient(x - br * 0.35, y - br * 1.4, br * 0.1, x, y - br, br); g.addColorStop(0, '#FFFFFF'); g.addColorStop(0.25, bc); g.addColorStop(1, rgba(bc, 0.75));
+      c.fillStyle = g; c.beginPath(); c.arc(x, y - br, br, 0, 6.2832); c.fill();
+      continue;
+    }
+    c.globalAlpha = WINTER ? 0.8 : 0.55; c.drawImage(gs, x - lw * 1.2, y - lw * 0.9, lw * 2.4, lw * 2.4); c.globalAlpha = 1;
+    c.fillStyle = C.lamp; c.beginPath(); c.arc(x, y - lw * 0.02, lw * 0.13, 0, 6.2832); c.fill();
+    c.fillStyle = i % 2 ? C.accent : C.brand; c.beginPath();
+    c.moveTo(x - lw * 0.5, y); c.quadraticCurveTo(x - lw * 0.46, y - lw * 0.46, x, y - lw * 0.46); c.quadraticCurveTo(x + lw * 0.46, y - lw * 0.46, x + lw * 0.5, y); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(x - lw * 0.5, y - 2.5, lw, 2.5);
+  }
+}
+function drawDrift(c, y0, offX, prog) {     // сугроб на подоконнике за стеклом: копится за время попытки
+  var hd = 5 + prog * cw * 0.6, x;
+  c.fillStyle = 'rgba(240,248,252,.97)'; c.beginPath(); c.moveTo(-2, y0 + 2);
+  for (x = -2; x <= W + 8; x += 8) c.lineTo(x, y0 - hd * (0.55 + 0.25 * Math.sin((x - offX) * 0.021 + 1) + 0.2 * Math.sin((x - offX) * 0.047 + 2.3)));
+  c.lineTo(W + 8, y0 + 2); c.closePath(); c.fill();
+}
+function drawWindowFrame(c, fx, fy) {       // переплёт витрины и подоконник — перед снегом
+  var x1 = fx + BG.pad + W * 0.17, x2 = fx + BG.pad + W * 0.83, y, A = H - counterH, sill = fy + BG.farH - counterH, hb = Math.min(H, sill);
+  c.fillStyle = 'rgba(4,22,36,.9)';
+  c.fillRect(x1 - 3, 0, 6, hb); c.fillRect(x2 - 3, 0, 6, hb);
+  for (y = fy + BG.farH - H - 14; y > fy - 10; y -= A * 0.8) if (y > -8 && y < H) c.fillRect(0, y, W, 6);
+  if (sill < H + 8) { c.fillRect(0, sill - 3, W, 8); c.fillStyle = 'rgba(255,255,255,.2)'; c.fillRect(0, sill - 3, W, 1.5); }
+  c.fillStyle = 'rgba(160,230,235,.24)'; c.fillRect(x1 - 3, 0, 1.5, hb); c.fillRect(x2 - 3, 0, 1.5, hb);
+}
+function drawBulbs(c, fx, fy, t) {          // мерцание гирлянды: чем выше башня, тем ярче
+  if (REDUCED) return;
+  var b = BG.bulbs, i, boost = 0.55 + 0.45 * clamp(G.camY / BG.maxCam, 0, 1) + G.cheer * 0.8;
+  for (i = 0; i < b.length; i++) {
+    var p = b[i], y = fy + p.y;
+    if (y < -16 || y > H + 16) continue;
+    var a = (0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * p.f + p.ph))) * boost, s = 11 + 5 * boost;
+    c.globalAlpha = Math.min(1, a); c.drawImage(glowSprite(p.col), fx + p.x - s, y - s, s * 2, s * 2);
+  }
+  c.globalAlpha = 1;
+}
+function render() {
+  var c = ctx, t = G.t, P = G.P, i;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var shx = 0, shy = 0;
+  if (G.shake > 0) { var s2 = G.shake * G.shake; shx = Math.sin(t * 71) * 6 * s2; shy = Math.cos(t * 57) * 4 * s2; }
+  var camPx = G.camY * cw;
+  var farX = -BG.pad + clamp(-G.camX * cw * 0.12 - par.x * 7, -BG.pad, BG.pad) + shx * 0.3;
+  var farY = Math.min(0, H - BG.farH + camPx * BG.k) + shy * 0.3;
+  c.clearRect(0, 0, W, H);
+  if (BG.far) c.drawImage(BG.far, farX, farY, BG.farW, BG.farH);
+  if (WINTER) {
+    drawSnow(c, W, H, t, camPx, 1);
+    var sill = farY + BG.farH - counterH;
+    if (sill < H + 60) drawDrift(c, sill, farX, clamp(t / 24, 0, 1));
+    if (G.fog > 0.01) { c.fillStyle = 'rgba(228,242,247,' + (0.5 * G.fog).toFixed(3) + ')'; c.fillRect(0, 0, W, H); }
+    drawWindowFrame(c, farX, farY);
+    drawBulbs(c, farX, farY, t);
+  }
+  function sx(wx) { return W / 2 + (wx - G.camX) * cw + shx; }
+  function sy(wy) { return baseY - (wy - G.camY) * cw + shy; }
+  drawLamps(c, camPx, shx, shy);
+  var cy = sy(0);
+  if (cy - BG.cTop < H) {                                       // стойка
+    c.drawImage(BG.counter, -BG.cPad + clamp(-G.camX * cw, -BG.cPad, BG.cPad) + shx, cy - BG.cTop, BG.cW, BG.cH);
+    if (cy - BG.cTop + BG.cH < H) { c.fillStyle = C.brandDark; c.fillRect(0, cy - BG.cTop + BG.cH - 1, W, H); }
+  }
+  /* башня качается как стержень от стойки: крышка уровня L уезжает на theta × L × CH */
+  var y = 0;
+  for (i = 0; i < G.cups.length; i++) { YB[i] = y; y += CH * (1 - G.cups[i].sq); }
+  YB[i] = y;
+  var theta = G.amp * Math.sin(2 * Math.PI * (P.swayHz * t + G.sph)) / (CUPS * CH);
+  var level = G.cups.length, top = G.cups[level - 1], topY = level * CH, covered = G.phase === 'drop';
+  for (i = 0; i < level; i++) {
+    var cup = G.cups[i], yy = sy(YB[i]);
+    if (yy - CH * cw * 1.7 > H || yy < -cw) continue;
+    drawCupLive(c, cup, sx(cup.x + theta * YB[i]), yy, cw, theta + cup.rk, t, 1, false, WINTER && i === level - 1 && !covered && !!HOT[cup.kind]);
+  }
+  if (WINTER && G.flakes.length) {                              // снежинки оседают на плёнке и тают
+    c.fillStyle = '#FFFFFF';
+    for (i = G.flakes.length - 1; i >= 0; i--) {
+      var fl = G.flakes[i], u0 = (t - fl.t0) / fl.life;
+      if (u0 >= 1 || fl.ci !== level - 1) { G.flakes.splice(i, 1); continue; }
+      if (u0 < 0) continue;
+      var fa = u0 < 0.5 ? 1 : 1 - (u0 - 0.5) / 0.5, fh = YB[level] + (1 - clamp(u0 / 0.2, 0, 1)) * 0.5;
+      c.globalAlpha = fa; c.beginPath(); c.arc(sx(top.x + theta * YB[level] + fl.x), sy(fh) - 1, cw * fl.r * (0.6 + 0.4 * fa), 0, 6.2832); c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+  if (G.phase === 'hover') {
+    var h = G.hover;
+    drawCupLive(c, h.cup, sx(top.x + hoverOffset(h, t)), sy(topY + GAP), cw, h.lean, t, clamp((t - h.t0) / 0.15, 0, 1), false, WINTER && !!HOT[h.cup.kind]);
+  } else if (G.phase === 'drop') {
+    var d = G.drop, p = clamp((t - d.t0) / DROP_S, 0, 1), e = p * p;
+    var off = d.j.perfect ? d.off * (1 - e) : d.off;            // «Ровно!» — стакан доводится точно в центр
+    drawCupLive(c, d.cup, sx(top.x + lidSway(G.amp, P.swayHz, level, t, G.sph) + off), sy(topY + GAP * (1 - e)), cw, d.lean * (1 - e) + theta * e, t, 1, false, false);
+  }
+  if (G.flash) {                                                // «Ровно!»: вспышка и кольцо
+    var u = (t - G.flash.t0) / 0.5;
+    if (u >= 1 || !G.cups[G.flash.level]) G.flash = null;
+    else {
+      var fl2 = G.flash.level, fx0 = sx(G.cups[fl2].x + theta * YB[fl2]), fy0 = sy(YB[fl2]), R = cw * (1.2 + 1.6 * u);
+      c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = (1 - u) * 0.85;
+      c.drawImage(glowSprite('#FFF3C4'), fx0 - R, fy0 - R * 0.6, R * 2, R * 1.2); c.restore();
+      c.save(); c.globalAlpha = 1 - u; c.strokeStyle = C.sun; c.lineWidth = Math.max(2, cw * 0.07 * (1 - u));
+      c.beginPath(); c.ellipse(fx0, fy0, cw * (0.5 + 0.9 * u), cw * (0.12 + 0.26 * u), 0, 0, 6.2832); c.stroke(); c.restore();
+      if (!REDUCED && u < 0.25) { c.fillStyle = 'rgba(255,255,255,' + (0.16 * (1 - u / 0.25)).toFixed(3) + ')'; c.fillRect(0, 0, W, H); }
+    }
+  }
+  if (G.phase === 'fall' && G.fall) {                           // упавший стакан летит с вращением перед стойкой
+    var f = G.fall;
+    drawCupLive(c, f.cup, sx(f.x), sy(f.y), cw, f.rot, t, 1, true, false);
+  }
+  for (i = 0; i < parts.length; i++) {                          // частицы
+    var q = parts[i], qa = clamp(q.life / q.max * 1.7, 0, 1), qx = sx(q.x), qy = sy(q.y);
+    c.globalAlpha = qa;
+    if (q.type === 'spark') {
+      c.strokeStyle = q.col; c.lineWidth = Math.max(1, q.r * cw); c.lineCap = 'round';
+      c.beginPath(); c.moveTo(qx, qy); c.lineTo(qx - q.vx * cw * 0.045, qy + q.vy * cw * 0.045); c.stroke();
+    } else { c.fillStyle = q.col; c.beginPath(); c.arc(qx, qy, Math.max(0.7, q.r * cw), 0, 6.2832); c.fill(); }
+  }
+  c.globalAlpha = 1;
+}
+/* Один цикл на requestAnimationFrame; dt ограничен, поэтому скорость одинакова на 60 и 120 Гц, а свёрнутая вкладка — пауза. */
+function frame(now) {
+  raf = requestAnimationFrame(frame);
+  var dt = clamp((now - lastNow) / 1000, 0, 0.05);
+  lastNow = now;
+  if (screen === 'game' && G) { update(dt); if (G) render(); }
+  else if (screen === 'start') heroFrame(dt);
+  else if (screen === 'result' && RV) resultFrame(dt);
+  if (tweens.length) stepTweens(dt);
+  fxFrame(dt);
+}
+
+/* ===== Ввод ===== */
+function setParallax(e) {
+  var r = stage.getBoundingClientRect();
+  if (r.width > 0) par.tx = clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1);
+}
+stage.addEventListener('pointerdown', function (e) {
+  e.preventDefault();
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (activePointer !== null) return;                 // второй палец не считается
+  activePointer = e.pointerId;
+  setParallax(e);
+  tap();
+});
+stage.addEventListener('pointermove', setParallax);   // лёгкий параллакс фона за пальцем или мышью
+function releasePointer(e) { if (e.pointerId === activePointer) activePointer = null; }
+window.addEventListener('pointerup', releasePointer);
+window.addEventListener('pointercancel', releasePointer);
+stage.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('keydown', function (e) {
+  var space = e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar', enter = e.key === 'Enter';
+  if (screen === 'game') {
+    if (space || enter || e.key === 'ArrowDown') { e.preventDefault(); if (!e.repeat) tap(); }
+    return;
+  }
+  if (screen === 'start' && (space || enter) && !e.repeat) { e.preventDefault(); startGame(); }
+});
+$('btn-play').addEventListener('click', startGame);
+$('btn-again').addEventListener('click', function () { if (!this.disabled) startGame(); });
+$('res-box').addEventListener('click', function () { if (RV) RV.t = 0; });   // тап по башне — проезд камеры ещё раз
+function onResize() {
+  layers = {}; layerCount = 0; grads = {}; gradCount = 0;
+  if (screen === 'game' && G) { resizeStage(); render(); }
+  else if (screen === 'start') sizeHero();
+  else if (screen === 'result') { sizeResult(); if (FX.on) fxSize(); }
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+
+/* ===== Запуск ===== */
+/* Заготовка под Telegram Mini App — без внешних скриптов. */
+try { if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } } catch (e) {}
+loadColors();
+var didReset = false;
+if (window.location.search.indexOf('reset=1') !== -1) {     // сброс попыток за сегодня — для проверки
+  var rs = gameState(new Date()); rs.used = 0; saveGameState(rs); didReset = true;
+}
+showStart();
+if (didReset) toast('Попытки на сегодня сброшены');
+lastNow = performance.now();
+raf = requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
