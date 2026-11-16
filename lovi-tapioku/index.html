@@ -38,7 +38,7 @@
   --card:#FFFDF6; --muted:#4A5A5A; --soft:#DDEDEA; --soft-2:#CFE9E6; --line:#E8DFC4; --sun:#FFD45C; --glass:#FFFFFF;
   --brand-light:#5FD0C8; --warm:#FFD98A;
   /* --- напитки и ингредиенты (по составу из меню) --- */
-  --milk:#FFF6E4; --milk-tea:#E3C29A; --milk-tea-dark:#C79A68; --cheese-foam:#FFE9A6; --cheese-foam-dark:#F1CB6A;
+  --milk:#FFF6E4; --milk-tea:#E3C29A; --milk-tea-dark:#C79A68; --black-tea:#6E4126; --cheese-foam:#FFE9A6; --cheese-foam-dark:#F1CB6A;
   --tapioca:#3B2519; --tapioca-hi:#8A5E40;
   --jasmine-tea:#EAD98C; --grape:#7B4FA3; --grape-tea:#A982C6; --lemon:#FBE77E; --lemon-rind:#EFC02F;
   --strawberry:#E8455A; --strawberry-tea:#F6B3B8; --peach:#FFB27A; --peach-dark:#F08A4B;
@@ -516,6 +516,14 @@ body > .wdx-ibtn{position:absolute}
   function setBack(cb) { backCb = typeof cb === 'function' ? cb : null; if (tgW) tgApply(); if (mxW) maxApply(); }
 
   /* ---------- оболочка (Р-1176): зал держит плеер, игра внутри iframe шлёт ему сообщения; музыка не прерывается при переходах ---------- */
+  var HAPTIC_OK = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1, success: 1, warning: 1, error: 1, select: 1 };
+  function buzzPat(p) {                       // число или короткий массив чисел 0…500 мс (то, что приходит из игры, чистим)
+    var out = [], i;
+    if (typeof p === 'number') return Math.max(0, Math.min(500, +p || 0));
+    if (!Array.isArray(p)) return 10;
+    for (i = 0; i < p.length && i < 12; i++) out.push(Math.max(0, Math.min(500, +p[i] || 0)));
+    return out;
+  }
   function shellFlag() {                      // игра открыта внутри iframe зала: в адресе shell=1 и есть родитель
     var q = '';
     try { q = String(window.location.search || ''); } catch (e) { q = ''; }
@@ -543,6 +551,8 @@ body > .wdx-ibtn{position:absolute}
     else if (m.t === 'next') { skip(); syncUi(); }
     else if (m.t === 'hold') { holdMode = true; stop(); }
     else if (m.t === 'release') { holdMode = false; if (pref('music')) play(); }
+    else if (m.t === 'haptic') { touched = true; if (HAPTIC_OK[m.k] === 1) haptic(m.k); }
+    else if (m.t === 'buzz') { touched = true; buzz(buzzPat(m.p)); }
     else if (m.t === 'close') { if (shellClose) shellClose(); }
   }
 
@@ -923,6 +933,7 @@ body > .wdx-ibtn{position:absolute}
   var HAPTIC_IMPACT = { light: 1, medium: 1, heavy: 1, rigid: 1, soft: 1 };
   function haptic(kind) {                     // kind: light | medium | heavy | success | warning | error | select
     var h, st;
+    if (cfg.shell) { shellPost('haptic', { k: kind }); return true; }     // в оболочке библиотек платформ нет: зал отдаёт сам
     try {
       h = tgW && tgVer('6.1') ? tgW.HapticFeedback : null;
       if (h) {
@@ -951,6 +962,7 @@ body > .wdx-ibtn{position:absolute}
   }
   function buzz(p) {                          // замена navigator.vibrate: в клиентах — их тактильная отдача, иначе обычная вибрация
     var k;
+    if (cfg.shell) { shellPost('buzz', { p: buzzPat(p) }); return; }
     if (tgW || mxW || vkB) {
       if (typeof p === 'number') k = p <= 12 ? 'light' : (p <= 22 ? 'medium' : 'heavy');
       else if (p && p.length >= 5) k = 'success';
@@ -1744,7 +1756,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.protoStart) el
     ['bg', '--bg', '#FBF7EC'], ['ink', '--ink', '#1F2A2A'], ['card', '--card', '#FFFDF6'], ['muted', '--muted', '#4A5A5A'],
     ['soft', '--soft', '#DDEDEA'], ['soft2', '--soft-2', '#CFE9E6'],
     ['sun', '--sun', '#FFD45C'], ['glass', '--glass', '#FFFFFF'], ['brandLight', '--brand-light', '#5FD0C8'], ['warm', '--warm', '#FFD98A'],
-    ['milk', '--milk', '#FFF6E4'], ['milkTea', '--milk-tea', '#E3C29A'], ['milkTeaDark', '--milk-tea-dark', '#C79A68'],
+    ['milk', '--milk', '#FFF6E4'], ['milkTea', '--milk-tea', '#E3C29A'], ['milkTeaDark', '--milk-tea-dark', '#C79A68'], ['blackTea', '--black-tea', '#6E4126'],
     ['cheeseFoam', '--cheese-foam', '#FFE9A6'], ['cheeseFoamDark', '--cheese-foam-dark', '#F1CB6A'],
     ['tapioca', '--tapioca', '#3B2519'], ['tapiocaHi', '--tapioca-hi', '#8A5E40'],
     ['jasmineTea', '--jasmine-tea', '#EAD98C'], ['grape', '--grape', '#7B4FA3'], ['grapeTea', '--grape-tea', '#A982C6'],
