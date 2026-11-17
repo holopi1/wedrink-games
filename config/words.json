@@ -3,21 +3,21 @@
   "prototype": true,
   "note": "Формат v7: поля t и d - слова дня (топпинг 290-299 и напиток 300), закодированные утилитой encode_words.py. Индекс = день недели как в Date.getDay(): 0 - воскресенье ... 6 - суббота. Руками не править.",
   "t": [
-    "mJqQuZY=",
-    "j7moUb9S",
-    "oLhUUU0=",
-    "sktValk=",
-    "RFBvc3cC",
-    "Zn99BmY=",
-    "eBIPCgQ="
+    "uLqwmbY=",
+    "r5mIcZ9y",
+    "gJh0cW0=",
+    "kmt1Snk=",
+    "ZHBPU1ci",
+    "Rl9dJkY=",
+    "WDIvKiQ="
   ],
   "d": [
-    "WUxOZ1w=",
-    "SWthZHo=",
-    "YHRzEn4M",
-    "ZhoKCRQx",
-    "HxwrITXA",
-    "Di8/MTM=",
-    "LT7PxNbo"
+    "eWxuR3w=",
+    "aUtBRFo=",
+    "QFRTMl4s",
+    "RjoqKTQR",
+    "PzwLARXg",
+    "Lg8fERM=",
+    "DR7v5PbI"
   ]
 }
