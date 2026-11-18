@@ -555,10 +555,10 @@ body > .wdx-ibtn{position:absolute}
   var LP_KEY = 'wedrink.lp';                  // параметры запуска (VK / MAX / Telegram), чтобы не терять при переходах зал <-> игра
   /* Тексты приза. Главное место — config/prize.json (правит штаб после сверки с кассой); здесь запасная копия на случай,
      если файл не загрузился. Числа порогов и попыток живут в коде игр (PRIZE_TOPPING, ATTEMPTS_PER_DAY) — тексты им не противоречат. */
-  var COND = '250 очков и больше — бесплатный топпинг, все 300 — напиток до 250 ₽ за наш счёт (10 главных призов в день, кто первый). Назови на кассе слово дня и номер телефона: каждый приз — раз в день, в одном заказе — один приз, кофе не участвует.';
+  var COND = '250 очков и больше — топпинг в подарок к напитку, все 300 — напиток до 250 ₽ за наш счёт при заказе от 120 ₽. Главных призов — десять в день: кто набрал 300 позже, получает топпинг. Назови на кассе слово дня и номер телефона в день игры: каждый приз — раз в день, в одном заказе — один приз, кофе не участвует. До 31 декабря.';
   var VALID = 'Слово действует сегодня до закрытия точки (22:00 по Новосибирску).';
-  var HEAD = { topping: 'Бесплатный топпинг', drink: 'Напиток до 250 ₽ за наш счёт' };
-  var CAP_NOTE = 'Главные призы на сегодня разобраны — за 300 очков сегодня бесплатный топпинг.';
+  var HEAD = { topping: 'Топпинг в подарок', drink: 'Напиток до 250 ₽ за наш счёт' };
+  var CAP_NOTE = 'Главные призы на сегодня разобраны — за 300 очков сегодня топпинг в подарок.';
   var PRIZE_URL = 'config/prize.json';
   /* Сервер игр (server/README.md): только на боевом адресе. window.WDX_API — подмена адреса для проверки. */
   var API = 'https://games.we-drink.online/api/';
@@ -573,7 +573,7 @@ body > .wdx-ibtn{position:absolute}
   var theme = { winter: false }, tgW = null, tgPending = false, tgLoading = false;
   var mxW = null, mxLoading = false, vkB = null, vkLoading = false, coded = null;
   var holdMode = false, backCb = null, shellWin = null, shellClose = null, shellSt = { has: false, now: '' };
-  var srvCur = null, capPend = false, capMem = null, memVid = '', prizeLoaded = false;
+  var srvCur = null, capPend = false, capMem = null, memVid = '', prizeLoaded = false, realPlay = false;
 
   /* ---------- профиль: читаем целиком, меняем одно поле ---------- */
   function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
@@ -1365,7 +1365,8 @@ body > .wdx-ibtn{position:absolute}
   function attempt(game) {                     // начало попытки (попытка уже списана игрой): сервер записывает «запуск»
     game = game || gameSlug();
     srvCur = null;
-    if (!apiBase() || !game || previewOn()) return;
+    realPlay = true;
+    if (!apiBase() || !game) return;
     srvCur = { game: game, p: post('session', { game: game, pf: platform(), src: srcTag(), vid: vid() })
       .then(function (o) { return o && o.ok && typeof o.sid === 'string' && typeof o.key === 'string' ? o : null; }) };
   }
@@ -1376,7 +1377,7 @@ body > .wdx-ibtn{position:absolute}
     top = score >= 300;
     if (!c) return;                              // сервера нет — главный приз без проверки (потолок держится только с сервером)
     if (top) capPend = true;
-    t = setTimeout(function () { if (top) capSettle(null); }, 4000);
+    t = setTimeout(function () { if (top) capSettle(null); }, 6500);   // запрос сам обрывается через 5 с; запас, чтобы ответ не потерялся
     c.p.then(function (s) {
       if (!s || !(window.crypto && window.crypto.subtle && typeof TextEncoder === 'function')) return null;
       return hmacHex(s.key, s.sid + '|' + c.game + '|' + score + '|').then(function (sig) {
@@ -1387,7 +1388,7 @@ body > .wdx-ibtn{position:absolute}
 
   /* ---------- суточный потолок главного приза (решает сервер; без ответа — приз остаётся) ---------- */
   function dayKey() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
-  function previewOn() { return previewScore() !== null; }
+  function previewOn() { return previewScore() !== null && !realPlay; }   // после настоящей попытки («Ещё раз» с экрана просмотра) — обычный режим
   function capGet() {
     var o = null;
     if (previewOn()) return /[?&]cap=1(?:&|$)/.test(String(window.location.search || '')) ? 'capped' : '';   // ?preview=300&cap=1 — вид билета, когда главные разобраны
@@ -1548,11 +1549,13 @@ function refreshTicketWords() {   // билет мог быть показан �
   if (!IS_PROTOTYPE) { tags = document.querySelectorAll('.ticket-tag:not([data-pv])'); for (i = 0; i < tags.length; i++) tags[i].style.display = "none"; }
 }
 function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el.startProto.hidden = !IS_PROTOTYPE; } catch (e) { /* элемент ещё не готов */ } }
-(function loadWeekWords() {
+(function loadWeekWords(tryNo) {
+  tryNo = tryNo || 0;
+  function retry() { if (tryNo < 2) setTimeout(function () { loadWeekWords(tryNo + 1); }, 1500 * (tryNo + 1)); }   // медленная сеть: ещё две попытки
   try {
     if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
     var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 2500);
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, tryNo ? 8000 : 4000);
     var okList = function (a) {
       if (!Array.isArray(a) || a.length !== 7) return false;
       for (var i = 0; i < 7; i++) { if (typeof a[i] !== 'string' || !a[i].trim() || a[i].length > 40 || /[<>]/.test(a[i])) return false; }
@@ -1561,7 +1564,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
     fetch('../config/words.json?v=' + Math.floor(Date.now() / 86400000), ctl ? { signal: ctl.signal } : undefined)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (o) {
-        if (!o) return;
+        if (!o) { retry(); return; }
         if (!(o.t && o.d && WDX.setCoded(o.t, o.d))) {          // v7: слова закодированы и раскодируются только при показе билета; иначе — старый формат
           if (!okList(o.topping) || !okList(o.drink)) return;
           WORDS_TOPPING = o.topping.map(function (s) { return s.trim(); });
@@ -1570,7 +1573,7 @@ function onWeekWords() { try { refreshTicketWords(); if (el && el.startProto) el
         if (typeof o.prototype === 'boolean') IS_PROTOTYPE = o.prototype;
         onWeekWords();
       })
-      .catch(function () { /* молча: остаются встроенные слова */ })
+      .catch(function () { retry(); })
       .then(function () { clearTimeout(timer); });
   } catch (e) { /* остаются встроенные слова */ }
 })();
