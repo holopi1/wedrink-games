@@ -878,7 +878,8 @@ body > .wdx-ibtn{position:absolute}
     try { if (window.sessionStorage.getItem(MAX_FLAG) === '1') return true; } catch (e) { /* нет sessionStorage */ }
     return false;
   }
-  function mxCall(obj, name, a, b) { try { if (obj && typeof obj[name] === 'function') return obj[name](a, b); } catch (e) { /* не поддерживается */ } }
+  function quiet(p) { try { if (p && typeof p.then === 'function') p.then(null, function () { /* вне клиента или не поддерживается */ }); } catch (e) { /* нет */ } return p; }
+  function mxCall(obj, name, a, b) { try { if (obj && typeof obj[name] === 'function') return quiet(obj[name](a, b)); } catch (e) { /* не поддерживается */ } }   // мост MAX отвечает промисами: отказ не должен падать в консоль
   function maxApply() {
     var bb;
     if (!mxW) return;
@@ -1394,7 +1395,7 @@ body > .wdx-ibtn{position:absolute}
     try { if (!t && inTelegram() && window.Telegram && window.Telegram.WebApp) t = window.Telegram.WebApp; } catch (e) { t = null; }
     try { if (!m && inMax() && window.WebApp && typeof window.WebApp === 'object') m = window.WebApp; } catch (e) { m = null; }
     try { if (t && typeof t.openLink === 'function') { t.openLink(url); return true; } } catch (e) { /* старый клиент */ }
-    try { if (m && typeof m.openLink === 'function') { m.openLink(url); return true; } } catch (e) { /* не поддерживается */ }
+    try { if (m && typeof m.openLink === 'function') { quiet(m.openLink(url)); return true; } } catch (e) { /* не поддерживается */ }
     return false;
   }
 
