@@ -1453,7 +1453,7 @@ body > .wdx-ibtn{position:absolute}
 
   /* ---------- запуск ---------- */
   function init(opts) {
-    var host, i, links;
+    var host, i, links, tgt;
     opts = opts || {};
     cfg.base = opts.base || ''; cfg.hall = !!opts.hall; cfg.sfx = !!opts.sfx;
     cfg.shell = !cfg.hall && shellFlag();     // игра внутри зала: музыку и кнопки платформ ведёт зал
@@ -1483,7 +1483,7 @@ body > .wdx-ibtn{position:absolute}
     else if (inMax()) maxLoad();
     srcTag();                                  // запомнить метку источника до переходов
     if (!previewOn()) {
-      if (cfg.hall) ev('hall');
+      if (cfg.hall) { tgt = target(); if (!tgt) ev('hall'); }   // со стартовым параметром событие шлёт зал: он знает, есть ли такая игра
       else if (!cfg.shell) ev('open', gameSlug());   // игра открыта сама, не из зала (прямая ссылка)
     }
   }
@@ -1502,7 +1502,7 @@ body > .wdx-ibtn{position:absolute}
     init: init, openLink: openLink, theme: setTheme, buzz: buzz, haptic: haptic, previewScore: previewScore,
     pref: pref, openSettings: openSettings, goHall: goHall, inTelegram: inTelegram, inMax: inMax, inVk: inVk,
     withParams: withParams, setCoded: setCoded, word: word, tail: tail, head: head,
-    _enc: encWord, attempt: attempt, finish: finish, target: target, platform: platform, srcTag: srcTag,
+    _enc: encWord, attempt: attempt, finish: finish, target: target, platform: platform, srcTag: srcTag, ev: ev,
     PREVIEW_WORD: 'ПРИМЕР',
     hold: function () { if (cfg.shell) shellPost('hold'); else { holdMode = true; stop(); } },        // пауза фоновой музыки на время раунда (ритм-игра)
     release: function () { if (cfg.shell) shellPost('release'); else { holdMode = false; if (pref('music')) play(); } },
