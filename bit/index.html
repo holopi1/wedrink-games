@@ -2548,12 +2548,13 @@ var CHART = [
 /*</CHART>*/
   /*<LOGIC>*/
   // Ступени сложности: tier — какие ноты разметки входят (1: ★ ≈40, 2: ★★ ≈55, 3: ★★★ ≈70);
-  // perf / good — окна PERFECT и GOOD в секундах (в обе стороны от момента ноты); travel — сколько секунд шарик падает до крышки.
+  // perf / good — окна PERFECT и GOOD в секундах (в обе стороны от момента ноты); travel — сколько секунд шарик падает до крышки;
+  // tgt — ЦЕЛЬ: доля «идеального» результата, дающая 300 (Р-1273: обычный игрок 250+ около 10 % попыток, 300 редко; подбор — tune2.js, проверка — sim.js).
   var LEVELS = [null,
-    { tier: 1, perf: 0.047, good: 0.105, travel: 1.90 },
-    { tier: 2, perf: 0.046, good: 0.100, travel: 1.65 },
-    { tier: 3, perf: 0.044, good: 0.095, travel: 1.40 }];
-  var W_GRADE = [0, 0.6, 1];                 // вес результата: промах 0, GOOD 0,6, PERFECT 1
+    { tier: 1, perf: 0.047, good: 0.170, travel: 1.90, tgt: 0.99 },
+    { tier: 2, perf: 0.046, good: 0.165, travel: 1.65, tgt: 0.99 },
+    { tier: 3, perf: 0.044, good: 0.160, travel: 1.40, tgt: 0.98 }];
+  var W_GRADE = [0, 0.7, 1];                 // вес результата: промах 0, GOOD 0,7, PERFECT 1
   // ноты из строки разметки: на ноту 4 знака base36 = пауза от прошлой ноты (мс) + (дорожка*3 + ступень-1)
   function parseNotes(s) {
     var out = [], t = 0, i, k;
@@ -2593,7 +2594,7 @@ var CHART = [
     }
     return out;
   }
-  function scoreOf(wsum, N) { return Math.round(300 * wsum / N); }
+  function scoreOf(wsum, N, L) { return Math.round(300 * Math.min(1, wsum / (N * ((L && L.tgt) || 1)))); }
   /*</LOGIC>*/
 
   var G = null, W = 0, H = 0, dpr = 1, GM = {}, LC = [];
@@ -2760,7 +2761,7 @@ var CHART = [
   window.addEventListener('pagehide', function () { if (G && G.audio) { try { G.audio.pause(); } catch (e) { /* не страшно */ } } });
 
   function btFinish() {
-    var g = G, score = scoreOf(g.wsum, g.rd.N);
+    var g = G, score = scoreOf(g.wsum, g.rd.N, g.L);
     G = null;
     btStop(g);
     endAttempt(g.s, score, rowsOf([['Точно', g.nP + '/' + g.rd.N], ['Хорошо', g.nG], ['Лучшая серия', g.maxC]]));
@@ -2802,7 +2803,7 @@ var CHART = [
         if (T >= G.rd.end) {
           G.state = 'end'; G.endT = 0;
           caption('Финал!', 1100);
-          Mascot.react(scoreOf(G.wsum, G.rd.N) >= 200 ? 'cheer' : 'wow', 1, 0.9);
+          Mascot.react(scoreOf(G.wsum, G.rd.N, G.L) >= 200 ? 'cheer' : 'wow', 1, 0.9);
         }
       }
     } else if (G.state === 'end') {
@@ -2861,7 +2862,7 @@ var CHART = [
       pBurst(x, y, 6, { col: [css.brandLight, '#FFFFFF'], sp: [60, 170], a: [-Math.PI / 2 - 1, -Math.PI / 2 + 1], g: 420, life: [0.25, 0.5], r: [1.6, 3] });
       Sfx.play('tap', 0.4 + l * 0.12);
     }
-    setHud(scoreOf(G.wsum, N));
+    setHud(scoreOf(G.wsum, N, G.L));
     if (G.combo % 10 === 0) {
       pText(GM.cx, GM.yHit * 0.5, 'Серия ' + G.combo, css.sun, 28); pShake(3.5); Mascot.react(G.combo % 30 === 0 ? 'wow' : 'cheer', 0.9, 0.9); buzz([14]);
     } else if (g === 2 && G.pRun % 5 === 0) {
