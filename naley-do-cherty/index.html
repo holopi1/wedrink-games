@@ -628,7 +628,7 @@ body > .wdx-ibtn{position:absolute}
   var HEAD = { topping: 'Топпинг в подарок', drink: 'Напиток до 250 ₽ за наш счёт' };
   var CAP_NOTE = 'Главные призы на сегодня разобраны — за 300 очков сегодня топпинг в подарок.';
   var PRIZE_URL = 'config/prize.json';
-  var RULES_URL = 'config/rules.md';
+  var RULES_URL = 'config/rules.json';
   /* Сервер игр (server/README.md): только на боевом адресе. window.WDX_API — подмена адреса для проверки. */
   var API = 'https://games.we-drink.online/api/';
   var VID_KEY = 'wedrink.vid', SRC_KEY = 'wedrink.src', CAP_KEY = 'wedrink.cap';
@@ -1387,7 +1387,7 @@ body > .wdx-ibtn{position:absolute}
     body = rulesBox.querySelector('.wdx-rules-body');
     try { rulesBox.querySelector('.wdx-rules-close').focus({ preventScroll: true }); } catch (e) { /* нет */ }
     if (typeof fetch !== 'function') { body.textContent = 'Правила акции: games.we-drink.online/rules.html'; return; }
-    fetch((cfg.base || '') + RULES_URL, { cache: 'no-cache' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+    fetch((cfg.base || '') + RULES_URL, { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { var t = j && typeof j.text === 'string' ? j.text : '';
       if (t && t.length < 60000) rulesRender(body, t); else body.textContent = 'Правила не загрузились. Проверь интернет и открой ещё раз.';
     }, function () { body.textContent = 'Правила не загрузились. Проверь интернет и открой ещё раз.'; });
   }
