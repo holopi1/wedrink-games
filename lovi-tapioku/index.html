@@ -1172,7 +1172,11 @@ body > .wdx-ibtn{position:absolute}
     }
   }
   function rulesRender(body, md) {
-    var lines = String(md).replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/), i, l, m, ul = null, node;
+    var vk = false, lines, i, l, m, ul = null, node;
+    try { vk = inVk(); } catch (e) { vk = false; }
+    lines = String(md).split(/\r?\n/);
+    if (vk) lines = lines.filter(function (x) { return !/<!--\s*кроме VK\s*-->/.test(x); });
+    lines = lines.join('\n').replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/);
     body.textContent = '';
     for (i = 0; i < lines.length; i++) {
       l = lines[i].replace(/\s+$/, '');
